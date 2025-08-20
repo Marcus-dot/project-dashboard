@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -12,7 +12,7 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState('')
 
-    const router = useRouter()
+
     const supabase = createClient()
 
     const handleSignup = async (e: React.FormEvent) => {
@@ -100,8 +100,8 @@ export default function SignupPage() {
 
                     {message && (
                         <div className={`p-3 rounded-lg text-sm ${message.includes('Success')
-                                ? 'bg-green-50 text-green-600'
-                                : 'bg-red-50 text-red-600'
+                            ? 'bg-green-50 text-green-600'
+                            : 'bg-red-50 text-red-600'
                             }`}>
                             {message}
                         </div>

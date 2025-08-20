@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Project } from '@/types/project'
+import { Project, Priority, Status } from '@/types/project'
+
 
 // Define what props this component accepts
 interface ProjectFormProps {
@@ -140,7 +141,7 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
                             </label>
                             <select
                                 value={formData.priority}
-                                onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                                onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                                 <option value="High">High</option>
@@ -155,7 +156,7 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
                             </label>
                             <select
                                 value={formData.status}
-                                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                                onChange={(e) => setFormData({ ...formData, status: e.target.value as Status })}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             >
                                 <option value="Planning">Planning</option>
