@@ -6,12 +6,30 @@ export class ProjectService {
     // Create a Supabase client instance
     private supabase = createClient()
 
-    // FUNCTION 1: Get all projects for the current user
+    // HELPER: Get user's company_id from their profile
+    private async getUserCompanyId() {
+        const { data: { user } } = await this.supabase.auth.getUser()
+        if (!user) return null
+
+        const { data: profile } = await this.supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('id', user.id)
+            .single()
+
+        return profile?.company_id
+    }
+
+    // FUNCTION 1: Get all projects for the user's company
     async getProjects() {
+        const companyId = await this.getUserCompanyId()
+        if (!companyId) return []
+
         const { data, error } = await this.supabase
-            .from('projects')           // From the projects table
-            .select('*')                 // Select all columns
-            .order('created_at', { ascending: false })  // Newest first
+            .from('projects')
+            .select('*')
+            .eq('company_id', companyId)  // Filter by company
+            .order('created_at', { ascending: false })
 
         if (error) throw error
         return data as Project[]
@@ -22,18 +40,20 @@ export class ProjectService {
         const { data, error } = await this.supabase
             .from('projects')
             .select('*')
-            .eq('id', id)                // Where id equals the provided id
-            .single()                    // Expect one result...
+            .eq('id', id)
+            .single()
 
         if (error) throw error
         return data as Project
     }
 
-    // FUNCTION 3: Create a new project
+    // FUNCTION 3: Create a new project for the company
     async createProject(project: Partial<Project>) {
-        // First, get the current user
         const { data: { user } } = await this.supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
+
+        const companyId = await this.getUserCompanyId()
+        if (!companyId) throw new Error('User not in a company')
 
         // Calculate the scale based on duration
         const scale = this.calculateScale(project.duration)
@@ -42,12 +62,14 @@ export class ProjectService {
         const { data, error } = await this.supabase
             .from('projects')
             .insert({
-                ...project,               // Spread all project properties
-                scale,                    // Add calculated scale
-                user_id: user.id          // Add current user's ID
+                ...project,
+                scale,
+                user_id: user.id,        // Keep for compatibility
+                company_id: companyId,    // Link to company
+                created_by: user.id       // Track who created it
             })
-            .select()                   // Return the created project
-            .single()                   // Expect one result
+            .select()
+            .single()
 
         if (error) throw error
         return data as Project
@@ -61,12 +83,12 @@ export class ProjectService {
         const { data, error } = await this.supabase
             .from('projects')
             .update({
-                ...updates,               // Spread the updates
-                ...(scale && { scale })   // Add scale if it exists
+                ...updates,
+                ...(scale && { scale })
             })
-            .eq('id', id)               // Where id equals the provided id
-            .select()                   // Return the updated project
-            .single()                   // Expect one result
+            .eq('id', id)
+            .select()
+            .single()
 
         if (error) throw error
         return data as Project
@@ -76,8 +98,8 @@ export class ProjectService {
     async deleteProject(id: string) {
         const { error } = await this.supabase
             .from('projects')
-            .delete()                   // Delete the row
-            .eq('id', id)               // Where id equals the provided id
+            .delete()
+            .eq('id', id)
 
         if (error) throw error
     }

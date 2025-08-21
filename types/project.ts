@@ -23,5 +23,25 @@ export interface Project {
     status: Status                // Planning/In progress/etc
     scale: Scale                  // Short/Medium/Long-term
     notes?: string                // Additional notes
-    user_id: string              // Which user owns this project
+    user_id: string               // Which user owns this project (keeping for compatibility)
+    company_id?: string           // Which company this belongs to (NEW!)
+    created_by?: string           // Who created this project (NEW!)
+}
+
+// NEW: Define what a Company looks like
+export interface Company {
+    id: string
+    name: string
+    access_code: string
+    created_at: string
+    created_by: string
+}
+
+// NEW: Define what a Profile looks like
+export interface Profile {
+    id: string
+    email: string
+    company_id?: string
+    created_at: string
+    updated_at: string
 }

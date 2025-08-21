@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectForm } from '@/components/projects/ProjectForm'
 import { ProjectService } from '@/lib/services/projects'
-import { Project } from '@/types/project'
+import { CompanyService } from '@/lib/services/company'
+import { Project, Company } from '@/types/project'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
@@ -17,16 +18,18 @@ export default function DashboardPage() {
     const [editingProject, setEditingProject] = useState<Project | undefined>()
     const [searchTerm, setSearchTerm] = useState('')
     const [currentFilter, setCurrentFilter] = useState('all')
+    const [company, setCompany] = useState<Company | null>(null)
 
-    // Create an instance of our project service
+    // Create instances of our services
     const projectService = new ProjectService()
+    const companyService = new CompanyService()
     const supabase = createClient()
     const router = useRouter()
     const [userEmail, setUserEmail] = useState<string>('')
 
-    // Load projects when page loads
+    // Load projects and company info when page loads
     useEffect(() => {
-        loadProjects()
+        initializeDashboard()
     }, [])
 
     // Filter projects when search or filter changes
@@ -34,18 +37,36 @@ export default function DashboardPage() {
         filterProjects()
     }, [projects, searchTerm, currentFilter])
 
-    // Check authentication and get user info
-    useEffect(() => {
-        const checkUser = async () => {
+    // Initialize dashboard - check auth, company, and load projects
+    const initializeDashboard = async () => {
+        try {
+            // Check if user is authenticated
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
                 router.push('/auth/login')
-            } else {
-                setUserEmail(user.email || '')
+                return
             }
+
+            setUserEmail(user.email || '')
+
+            // Check if user has a company
+            const userCompany = await companyService.getUserCompany()
+            if (!userCompany) {
+                // No company - redirect to company setup
+                router.push('/company-setup')
+                return
+            }
+
+            setCompany(userCompany)
+
+            // Load projects for the company
+            await loadProjects()
+        } catch (error) {
+            console.error('Error initializing dashboard:', error)
+        } finally {
+            setLoading(false)
         }
-        checkUser()
-    }, [])
+    }
 
     // FUNCTION: Load all projects from database
     const loadProjects = async () => {
@@ -54,8 +75,6 @@ export default function DashboardPage() {
             setProjects(data)
         } catch (error) {
             console.error('Error loading projects:', error)
-        } finally {
-            setLoading(false)
         }
     }
 
@@ -120,12 +139,17 @@ export default function DashboardPage() {
 
     // FUNCTION: Export projects as JSON
     const handleExport = () => {
-        const dataStr = JSON.stringify(projects, null, 2)
+        const exportData = {
+            company: company?.name,
+            exportDate: new Date().toISOString(),
+            projects: projects
+        }
+        const dataStr = JSON.stringify(exportData, null, 2)
         const dataBlob = new Blob([dataStr], { type: 'application/json' })
         const url = URL.createObjectURL(dataBlob)
         const link = document.createElement('a')
         link.href = url
-        link.download = `projects_${new Date().toISOString().split('T')[0]}.json`
+        link.download = `${company?.name || 'projects'}_${new Date().toISOString().split('T')[0]}.json`
         link.click()
         URL.revokeObjectURL(url)
     }
@@ -134,6 +158,14 @@ export default function DashboardPage() {
     const handleLogout = async () => {
         await supabase.auth.signOut()
         router.push('/')
+    }
+
+    // FUNCTION: Copy access code to clipboard
+    const copyAccessCode = () => {
+        if (company?.access_code) {
+            navigator.clipboard.writeText(company.access_code)
+            alert('Access code copied to clipboard!')
+        }
     }
 
     // Calculate statistics
@@ -148,7 +180,7 @@ export default function DashboardPage() {
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="text-gray-500">Loading projects...</div>
+                <div className="text-gray-500">Loading dashboard...</div>
             </div>
         )
     }
@@ -156,17 +188,36 @@ export default function DashboardPage() {
     return (
         <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
             <div className="bg-white p-8 rounded-2xl w-full max-w-7xl mx-auto">
-                {/* User info bar - NOW INSIDE THE WHITE CONTAINER */}
+                {/* Company and User info bar */}
                 <div className="flex justify-between items-center mb-6 pb-4 border-b">
-                    <div className="text-sm text-gray-600">
-                        Logged in as: <span className="font-medium">{userEmail}</span>
+                    <div>
+                        <div className="text-lg font-semibold text-gray-800">
+                            {company?.name}
+                        </div>
+                        <div className="text-sm text-gray-600">
+                            Logged in as: <span className="font-medium">{userEmail}</span>
+                        </div>
                     </div>
-                    <button
-                        onClick={handleLogout}
-                        className="text-sm px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                    >
-                        Sign Out
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* Access Code Display */}
+                        <div className="bg-gray-50 px-3 py-2 rounded-lg">
+                            <span className="text-xs text-gray-500">Access Code: </span>
+                            <span className="font-mono font-bold text-indigo-600">{company?.access_code}</span>
+                            <button
+                                onClick={copyAccessCode}
+                                className="ml-2 text-xs text-indigo-600 hover:text-indigo-700"
+                                title="Copy code"
+                            >
+                                📋
+                            </button>
+                        </div>
+                        <button
+                            onClick={handleLogout}
+                            className="text-sm px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                        >
+                            Sign Out
+                        </button>
+                    </div>
                 </div>
 
                 {/* Header - matching your SO's design! */}
@@ -288,6 +339,16 @@ export default function DashboardPage() {
                                 ? 'No projects found matching your criteria'
                                 : 'No projects yet. Click "Add New Project" to get started!'}
                         </p>
+                        {projects.length === 0 && company && (
+                            <div className="mt-6 p-4 bg-indigo-50 rounded-lg max-w-md mx-auto">
+                                <p className="text-sm text-indigo-800 mb-2">
+                                    👥 Invite your team to collaborate!
+                                </p>
+                                <p className="text-xs text-indigo-600">
+                                    Share this access code: <span className="font-mono font-bold">{company.access_code}</span>
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 

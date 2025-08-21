@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -11,7 +10,6 @@ export default function SignupPage() {
     const [confirmPassword, setConfirmPassword] = useState('')
     const [loading, setLoading] = useState(false)
     const [message, setMessage] = useState('')
-
 
     const supabase = createClient()
 
@@ -31,7 +29,7 @@ export default function SignupPage() {
             email,
             password,
             options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback`
+                emailRedirectTo: `${window.location.origin}/company-setup`  // CHANGED: Redirect to company setup
             }
         })
 
@@ -39,7 +37,7 @@ export default function SignupPage() {
             setMessage(error.message)
             setLoading(false)
         } else {
-            setMessage('Success! Check your email to confirm your account.')
+            setMessage('Success! Check your email to confirm your account. After confirming, you\'ll set up your company.')
         }
     }
 
