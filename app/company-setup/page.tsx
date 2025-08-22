@@ -53,6 +53,7 @@ export default function CompanySetupPage() {
       // Redirect to dashboard
       router.push('/dashboard')
     } catch (error) {
+      console.error('Full error details:', error)  // ADD THIS LINE
       const errorMessage = error instanceof Error ? error.message : 'Failed to create company'
       setError(errorMessage)
       setLoading(false)
