@@ -14,7 +14,8 @@ interface ProjectFormProps {
 export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
     const [isSubmitting, setIsSubmitting] = useState(false)
 
-    // Initialize form with existing project data (if editing) or empty values
+    const [showAdvanced, setShowAdvanced] = useState(false)
+
     const [formData, setFormData] = useState({
         name: project?.name || '',
         owner: project?.owner || '',
@@ -23,7 +24,11 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
         start_date: project?.start_date || '',
         priority: project?.priority || 'Medium',
         status: project?.status || 'Planning',
-        notes: project?.notes || ''
+        notes: project?.notes || '',
+        budget: project?.budget || '',
+        expected_revenue: project?.expected_revenue || '',
+        discount_rate: project?.discount_rate || '10',
+        actual_costs: project?.actual_costs || '',
     })
 
     // Handle form submission
@@ -33,8 +38,18 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
 
         try {
             await onSubmit({
-                ...formData,
-                duration: formData.duration ? parseInt(formData.duration.toString()) : undefined
+                name: formData.name,
+                owner: formData.owner || undefined,
+                details: formData.details || undefined,
+                notes: formData.notes || undefined,
+                start_date: formData.start_date || undefined,
+                priority: formData.priority as Priority,
+                status: formData.status as Status,
+                duration: formData.duration ? parseInt(formData.duration.toString()) : undefined,
+                budget: formData.budget ? parseFloat(formData.budget.toString()) : undefined,
+                expected_revenue: formData.expected_revenue ? parseFloat(formData.expected_revenue.toString()) : undefined,
+                discount_rate: formData.discount_rate ? parseFloat(formData.discount_rate.toString()) : undefined,
+                actual_costs: formData.actual_costs ? parseFloat(formData.actual_costs.toString()) : undefined,
             })
         } finally {
             setIsSubmitting(false)
@@ -181,6 +196,94 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
                             placeholder="Any additional notes..."
                         />
                     </div>
+
+                    {/* Advanced Section Toggle */}
+                    <div className="pt-4 border-t">
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvanced(!showAdvanced)}
+                            className="flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                        >
+                            <span>{showAdvanced ? '▼' : '▶'}</span>
+                            Financial & Risk Assessment
+                        </button>
+                    </div>
+
+                    {/* Advanced Fields */}
+                    {showAdvanced && (
+                        <div className="space-y-4 pt-2 pl-4 border-l-2 border-indigo-200">
+                            {/* Budget and Expected Revenue */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Budget ($)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={formData.budget}
+                                        onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Expected Revenue ($)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={formData.expected_revenue}
+                                        onChange={(e) => setFormData({ ...formData, expected_revenue: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Actual Costs and Discount Rate */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Actual Costs ($)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={formData.actual_costs}
+                                        onChange={(e) => setFormData({ ...formData, actual_costs: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Discount Rate (%)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        value={formData.discount_rate}
+                                        onChange={(e) => setFormData({ ...formData, discount_rate: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="10"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="bg-blue-50 p-3 rounded-lg text-xs text-blue-800">
+                                <strong>NPV Calculation:</strong> NPV will be automatically calculated based on expected revenue, actual costs, discount rate, and project duration.
+                            </div>
+                        </div>
+                    )}
 
                     {/* Form buttons */}
                     <div className="flex justify-end gap-3 pt-4 border-t">

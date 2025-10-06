@@ -1,7 +1,8 @@
-'use client'  // This runs in the browser
+'use client'
 
 import { useState } from 'react'
 import { Project } from '@/types/project'
+import { formatCurrency } from '@/lib/utils/calculations'
 
 // Define what props this component accepts
 interface ProjectCardProps {
@@ -102,6 +103,34 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
                 {project.notes && (
                     <div className="pt-2 border-t">
                         <p className="text-xs text-gray-500">{project.notes}</p>
+                    </div>
+                )}
+
+                {(project.budget || project.npv !== undefined) && (
+                    <div className="pt-3 mt-3 border-t border-gray-200">
+                        <div className="text-xs font-medium text-gray-500 mb-2">Financial</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            {project.budget !== undefined && project.budget > 0 && (
+                                <div>
+                                    <span className="text-gray-600">Budget:</span>
+                                    <div className="font-semibold text-gray-800">{formatCurrency(project.budget)}</div>
+                                </div>
+                            )}
+                            {project.actual_costs !== undefined && project.actual_costs > 0 && (
+                                <div>
+                                    <span className="text-gray-600">Actual:</span>
+                                    <div className="font-semibold text-gray-800">{formatCurrency(project.actual_costs)}</div>
+                                </div>
+                            )}
+                            {project.npv !== undefined && project.npv !== null && (
+                                <div className="col-span-2 mt-1">
+                                    <span className="text-gray-600">NPV:</span>
+                                    <div className={`font-bold text-sm ${project.npv >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(project.npv)}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

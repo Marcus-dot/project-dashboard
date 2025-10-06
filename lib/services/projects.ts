@@ -1,6 +1,6 @@
-// This service handles all project-related operations
 import { createClient } from '@/lib/supabase/client'
 import type { Project } from '@/types/project'
+import { calculateNPV } from '@/lib/utils/calculations'
 
 export class ProjectService {
     // Create a Supabase client instance
@@ -47,7 +47,6 @@ export class ProjectService {
         return data as Project
     }
 
-    // FUNCTION 3: Create a new project for the company
     async createProject(project: Partial<Project>) {
         const { data: { user } } = await this.supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
@@ -55,18 +54,24 @@ export class ProjectService {
         const companyId = await this.getUserCompanyId()
         if (!companyId) throw new Error('User not in a company')
 
-        // Calculate the scale based on duration
         const scale = this.calculateScale(project.duration)
 
-        // Insert the project into the database
+        const npv = this.calculateProjectNPV(
+            project.expected_revenue || 0,
+            project.actual_costs || 0,
+            project.discount_rate || 10,
+            project.duration || 0
+        )
+
         const { data, error } = await this.supabase
             .from('projects')
             .insert({
                 ...project,
                 scale,
-                user_id: user.id,        // Keep for compatibility
-                company_id: companyId,    // Link to company
-                created_by: user.id       // Track who created it
+                npv,
+                user_id: user.id,
+                company_id: companyId,
+                created_by: user.id
             })
             .select()
             .single()
@@ -75,16 +80,24 @@ export class ProjectService {
         return data as Project
     }
 
-    // FUNCTION 4: Update an existing project
     async updateProject(id: string, updates: Partial<Project>) {
-        // Recalculate scale if duration changed
+        const existing = await this.getProject(id)
+
         const scale = updates.duration ? this.calculateScale(updates.duration) : undefined
+
+        const npv = this.calculateProjectNPV(
+            updates.expected_revenue ?? existing.expected_revenue ?? 0,
+            updates.actual_costs ?? existing.actual_costs ?? 0,
+            updates.discount_rate ?? existing.discount_rate ?? 10,
+            updates.duration ?? existing.duration ?? 0
+        )
 
         const { data, error } = await this.supabase
             .from('projects')
             .update({
                 ...updates,
-                ...(scale && { scale })
+                ...(scale && { scale }),
+                npv
             })
             .eq('id', id)
             .select()
@@ -104,11 +117,19 @@ export class ProjectService {
         if (error) throw error
     }
 
-    // HELPER FUNCTION: Calculate project scale based on duration
     private calculateScale(duration?: number): 'Short-term' | 'Medium-term' | 'Long-term' {
         if (!duration) return 'Short-term'
-        if (duration <= 3) return 'Short-term'      // 0-3 months
-        if (duration <= 12) return 'Medium-term'    // 4-12 months
-        return 'Long-term'                          // 13+ months
+        if (duration <= 3) return 'Short-term'
+        if (duration <= 12) return 'Medium-term'
+        return 'Long-term'
+    }
+
+    private calculateProjectNPV(
+        expectedRevenue: number,
+        actualCosts: number,
+        discountRate: number,
+        durationMonths: number
+    ): number {
+        return calculateNPV(expectedRevenue, actualCosts, discountRate, durationMonths)
     }
 }

@@ -8,6 +8,7 @@ import { CompanyService } from '@/lib/services/company'
 import { Project, Company } from '@/types/project'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { formatCurrency } from '@/lib/utils/calculations'
 
 export default function DashboardPage() {
     // State management
@@ -18,6 +19,7 @@ export default function DashboardPage() {
     const [editingProject, setEditingProject] = useState<Project | undefined>()
     const [searchTerm, setSearchTerm] = useState('')
     const [currentFilter, setCurrentFilter] = useState('all')
+    const [priorityFilter, setPriorityFilter] = useState('all')
     const [company, setCompany] = useState<Company | null>(null)
 
     // Create instances of our services
@@ -32,10 +34,9 @@ export default function DashboardPage() {
         initializeDashboard()
     }, [])
 
-    // Filter projects when search or filter changes
     useEffect(() => {
         filterProjects()
-    }, [projects, searchTerm, currentFilter])
+    }, [projects, searchTerm, currentFilter, priorityFilter])
 
     // Initialize dashboard - check auth, company, and load projects
     const initializeDashboard = async () => {
@@ -78,16 +79,17 @@ export default function DashboardPage() {
         }
     }
 
-    // FUNCTION: Filter projects based on search and scale filter
     const filterProjects = () => {
         let filtered = [...projects]
 
-        // Apply scale filter
         if (currentFilter !== 'all') {
             filtered = filtered.filter(p => p.scale === currentFilter)
         }
 
-        // Apply search
+        if (priorityFilter !== 'all') {
+            filtered = filtered.filter(p => p.priority === priorityFilter)
+        }
+
         if (searchTerm) {
             const term = searchTerm.toLowerCase()
             filtered = filtered.filter(p =>
@@ -168,12 +170,14 @@ export default function DashboardPage() {
         }
     }
 
-    // Calculate statistics
     const stats = {
         total: projects.length,
         inProgress: projects.filter(p => p.status === 'In progress').length,
         shortTerm: projects.filter(p => p.scale === 'Short-term').length,
-        longTerm: projects.filter(p => p.scale === 'Long-term').length
+        longTerm: projects.filter(p => p.scale === 'Long-term').length,
+        totalBudget: projects.reduce((sum, p) => sum + (p.budget || 0), 0),
+        totalNPV: projects.reduce((sum, p) => sum + (p.npv || 0), 0),
+        highPriority: projects.filter(p => p.priority === 'High').length,
     }
 
     // Show loading state
@@ -228,32 +232,43 @@ export default function DashboardPage() {
                     Strategically visualize and manage all internal projects.
                 </p>
 
-                {/* Stats Section - exactly like the original! */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-blue-100 p-6 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-4xl font-bold text-blue-600 mb-2">{stats.total}</div>
-                        <div className="text-sm font-medium text-blue-800 text-center">Total Projects</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
+                    <div className="bg-blue-100 p-4 rounded-xl flex flex-col items-center justify-center">
+                        <div className="text-3xl font-bold text-blue-600 mb-1">{stats.total}</div>
+                        <div className="text-xs font-medium text-blue-800 text-center">Total Projects</div>
                     </div>
-                    <div className="bg-green-100 p-6 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-4xl font-bold text-green-600 mb-2">{stats.inProgress}</div>
-                        <div className="text-sm font-medium text-green-800 text-center">In Progress</div>
+                    <div className="bg-green-100 p-4 rounded-xl flex flex-col items-center justify-center">
+                        <div className="text-3xl font-bold text-green-600 mb-1">{stats.inProgress}</div>
+                        <div className="text-xs font-medium text-green-800 text-center">In Progress</div>
                     </div>
-                    <div className="bg-orange-100 p-6 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-4xl font-bold text-orange-600 mb-2">{stats.shortTerm}</div>
-                        <div className="text-sm font-medium text-orange-800 text-center">Short-Term</div>
+                    <div className="bg-red-100 p-4 rounded-xl flex flex-col items-center justify-center">
+                        <div className="text-3xl font-bold text-red-600 mb-1">{stats.highPriority}</div>
+                        <div className="text-xs font-medium text-red-800 text-center">High Priority</div>
                     </div>
-                    <div className="bg-purple-100 p-6 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-4xl font-bold text-purple-600 mb-2">{stats.longTerm}</div>
-                        <div className="text-sm font-medium text-purple-800 text-center">Long-Term</div>
+                    <div className="bg-orange-100 p-4 rounded-xl flex flex-col items-center justify-center">
+                        <div className="text-3xl font-bold text-orange-600 mb-1">{stats.shortTerm}</div>
+                        <div className="text-xs font-medium text-orange-800 text-center">Short-Term</div>
+                    </div>
+                    <div className="bg-cyan-100 p-4 rounded-xl flex flex-col items-center justify-center">
+                        <div className="text-2xl font-bold text-cyan-600 mb-1">{formatCurrency(stats.totalBudget)}</div>
+                        <div className="text-xs font-medium text-cyan-800 text-center">Total Budget</div>
+                    </div>
+                    <div className={`p-4 rounded-xl flex flex-col items-center justify-center ${stats.totalNPV >= 0 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
+                        <div className={`text-2xl font-bold mb-1 ${stats.totalNPV >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {formatCurrency(stats.totalNPV)}
+                        </div>
+                        <div className={`text-xs font-medium text-center ${stats.totalNPV >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
+                            Portfolio NPV
+                        </div>
                     </div>
                 </div>
 
-                {/* Filter & Add Project Section */}
-                <div className="flex flex-col sm:flex-row items-center justify-between mb-6 space-y-4 sm:space-y-0">
-                    <div className="flex space-x-2">
+                <div className="mb-6">
+                    <div className="text-sm font-medium text-gray-700 mb-2">Filter by Scale:</div>
+                    <div className="flex flex-wrap gap-2 mb-4">
                         <button
                             onClick={() => setCurrentFilter('all')}
-                            className={`px-4 py-2 font-medium rounded-lg transition-colors ${currentFilter === 'all'
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'all'
                                 ? 'bg-gray-300 text-gray-700'
                                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                                 }`}
@@ -262,7 +277,7 @@ export default function DashboardPage() {
                         </button>
                         <button
                             onClick={() => setCurrentFilter('Short-term')}
-                            className={`px-4 py-2 font-medium rounded-lg transition-colors ${currentFilter === 'Short-term'
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'Short-term'
                                 ? 'bg-orange-300 text-orange-800'
                                 : 'bg-orange-200 text-orange-800 hover:bg-orange-300'
                                 }`}
@@ -271,7 +286,7 @@ export default function DashboardPage() {
                         </button>
                         <button
                             onClick={() => setCurrentFilter('Medium-term')}
-                            className={`px-4 py-2 font-medium rounded-lg transition-colors ${currentFilter === 'Medium-term'
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'Medium-term'
                                 ? 'bg-blue-300 text-blue-800'
                                 : 'bg-blue-200 text-blue-800 hover:bg-blue-300'
                                 }`}
@@ -280,14 +295,58 @@ export default function DashboardPage() {
                         </button>
                         <button
                             onClick={() => setCurrentFilter('Long-term')}
-                            className={`px-4 py-2 font-medium rounded-lg transition-colors ${currentFilter === 'Long-term'
-                                ? 'bg-purple-300 text-purple-800'
-                                : 'bg-purple-200 text-purple-800 hover:bg-purple-300'
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'Long-term'
+                                ? 'bg-gray-300 text-gray-800'
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                                 }`}
                         >
                             Long-Term
                         </button>
                     </div>
+
+                    <div className="text-sm font-medium text-gray-700 mb-2">Filter by Priority:</div>
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => setPriorityFilter('all')}
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'all'
+                                ? 'bg-gray-300 text-gray-700'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                        >
+                            All
+                        </button>
+                        <button
+                            onClick={() => setPriorityFilter('High')}
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'High'
+                                ? 'bg-red-300 text-red-800'
+                                : 'bg-red-200 text-red-800 hover:bg-red-300'
+                                }`}
+                        >
+                            High Priority
+                        </button>
+                        <button
+                            onClick={() => setPriorityFilter('Medium')}
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'Medium'
+                                ? 'bg-yellow-300 text-yellow-800'
+                                : 'bg-yellow-200 text-yellow-800 hover:bg-yellow-300'
+                                }`}
+                        >
+                            Medium Priority
+                        </button>
+                        <button
+                            onClick={() => setPriorityFilter('Low')}
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'Low'
+                                ? 'bg-green-300 text-green-800'
+                                : 'bg-green-200 text-green-800 hover:bg-green-300'
+                                }`}
+                        >
+                            Low Priority
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-between mb-6 space-y-4 sm:space-y-0">
+                    <div></div>
 
                     <div className="flex space-x-2">
                         <button
