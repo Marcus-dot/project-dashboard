@@ -1,34 +1,35 @@
-// Define the structure of our data - like a blueprint!
-
-// These are the only values allowed for priority
 export type Priority = 'High' | 'Medium' | 'Low'
-
-// These are the only values allowed for status
 export type Status = 'Planning' | 'In progress' | 'Complete' | 'Paused' | 'Cancelled'
-
-// These are the only values allowed for scale
 export type Scale = 'Short-term' | 'Medium-term' | 'Long-term'
+export type UserRole = 'admin' | 'manager' | 'member'
 
-// This defines what a Project object looks like
 export interface Project {
-    id: string                    // Unique identifier
-    created_at: string            // When it was created
-    updated_at: string            // When it was last modified
-    name: string                  // Project name (required)
-    owner?: string                // Who owns it (? means optional)
-    details?: string              // Project details
-    duration?: number             // How many months
-    start_date?: string           // Start date
-    priority: Priority            // High/Medium/Low
-    status: Status                // Planning/In progress/etc
-    scale: Scale                  // Short/Medium/Long-term
-    notes?: string                // Additional notes
-    user_id: string               // Which user owns this project (keeping for compatibility)
-    company_id?: string           // Which company this belongs to (NEW!)
-    created_by?: string           // Who created this project (NEW!)
+    id: string
+    created_at: string
+    updated_at: string
+    name: string
+    owner?: string
+    details?: string
+    duration?: number
+    start_date?: string
+    priority: Priority
+    status: Status
+    scale: Scale
+    notes?: string
+    user_id: string
+    company_id: string
+    created_by?: string
+    budget?: number
+    actual_costs?: number
+    discount_rate?: number
+    expected_revenue?: number
+    npv?: number
+    resource_allocation?: Record<string, number>
+    resource_utilization?: number
+    risk_score?: number
+    risk_factors?: Record<string, any>
 }
 
-// NEW: Define what a Company looks like
 export interface Company {
     id: string
     name: string
@@ -37,11 +38,12 @@ export interface Company {
     created_by: string
 }
 
-// NEW: Define what a Profile looks like
 export interface Profile {
     id: string
     email: string
+    full_name?: string
     company_id?: string
+    role: UserRole
     created_at: string
     updated_at: string
 }
