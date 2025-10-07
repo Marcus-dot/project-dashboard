@@ -1,10 +1,12 @@
-// This file creates a Supabase client for use in the browser
 import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {
-    // Create and return a Supabase client using our environment variables
-    return createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Missing Supabase environment variables. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env file.')
+    }
+
+    return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
