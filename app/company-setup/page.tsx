@@ -11,7 +11,7 @@ export default function CompanySetupPage() {
   const [generatedCode, setGeneratedCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  
+
   const router = useRouter()
   const companyService = new CompanyService()
 
@@ -20,16 +20,15 @@ export default function CompanySetupPage() {
     const checkExistingCompany = async () => {
       const hasCompany = await companyService.isUserInCompany()
       if (hasCompany) {
-        // User already in a company, redirect to dashboard
         router.push('/dashboard')
       }
     }
     checkExistingCompany()
-  }, [companyService, router])
+  }, [])
 
   // Generate a random access code for new companies
   const generateAccessCode = () => {
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase()
+    const code = 'DASH-' + Math.random().toString(36).substring(2, 8).toUpperCase()
     setGeneratedCode(code)
     return code
   }
@@ -41,19 +40,24 @@ export default function CompanySetupPage() {
     setError('')
 
     try {
-      // Use generated code or custom code
       const finalCode = generatedCode || generateAccessCode()
-      
+
+      console.log('Creating company:', companyName, finalCode)
+
       // Create the company
-      const company = await companyService.createCompany(companyName, finalCode)
-      
-      // Join the company
-      await companyService.joinCompany(company.id)
-      
+      await companyService.createCompany(companyName, finalCode)
+
+      console.log('Company created, now joining...')
+
+      // Join the company using the access code (not the ID)
+      await companyService.joinCompany(finalCode)
+
+      console.log('Successfully joined company!')
+
       // Redirect to dashboard
       router.push('/dashboard')
     } catch (error) {
-      console.error('Full error details:', error)  // ADD THIS LINE
+      console.error('Full error details:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to create company'
       setError(errorMessage)
       setLoading(false)
@@ -69,16 +73,16 @@ export default function CompanySetupPage() {
     try {
       // Validate the access code
       const { valid, company } = await companyService.validateAccessCode(accessCode)
-      
+
       if (!valid || !company) {
         setError('Invalid access code. Please check and try again.')
         setLoading(false)
         return
       }
 
-      // Join the company
-      await companyService.joinCompany(company.id)
-      
+      // Join the company using access code
+      await companyService.joinCompany(accessCode)
+
       // Redirect to dashboard
       router.push('/dashboard')
     } catch (error) {
@@ -91,7 +95,6 @@ export default function CompanySetupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl p-8 shadow-2xl max-w-md w-full">
-        {/* Title */}
         <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">
           Welcome! 🎉
         </h1>
@@ -99,7 +102,6 @@ export default function CompanySetupPage() {
           Let&apos;s get you set up with a company
         </p>
 
-        {/* Mode Selection */}
         {mode === 'choose' && (
           <div className="space-y-4">
             <button
@@ -131,7 +133,6 @@ export default function CompanySetupPage() {
           </div>
         )}
 
-        {/* Create Company Form */}
         {mode === 'create' && (
           <form onSubmit={handleCreateCompany} className="space-y-4">
             <div>
@@ -144,7 +145,7 @@ export default function CompanySetupPage() {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="ABC Marketing Ltd"
+                placeholder="DASHLY Zambia"
               />
             </div>
 
@@ -192,7 +193,6 @@ export default function CompanySetupPage() {
           </form>
         )}
 
-        {/* Join Company Form */}
         {mode === 'join' && (
           <form onSubmit={handleJoinCompany} className="space-y-4">
             <div>
@@ -205,8 +205,8 @@ export default function CompanySetupPage() {
                 value={accessCode}
                 onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono uppercase"
-                placeholder="Enter code"
-                maxLength={10}
+                placeholder="DASH-ABC123"
+                maxLength={20}
               />
               <p className="text-xs text-gray-500 mt-1">
                 Get this code from your company admin
@@ -238,7 +238,6 @@ export default function CompanySetupPage() {
           </form>
         )}
 
-        {/* Help text */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
             Need help? Contact your company administrator

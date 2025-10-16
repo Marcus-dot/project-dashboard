@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { Project } from '@/types/project'
 import { formatCurrency } from '@/lib/utils/calculations'
+import { NPVModal } from '@/components/modals/NPVModal'
+import { Edit2, Trash2, BarChart3 } from 'lucide-react'
 
-// Define what props this component accepts
 interface ProjectCardProps {
     project: Project
     onEdit: (project: Project) => void
@@ -13,8 +14,8 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
     const [isDeleting, setIsDeleting] = useState(false)
+    const [showNPVModal, setShowNPVModal] = useState(false)
 
-    // Handle delete with confirmation
     const handleDelete = async () => {
         if (confirm('Are you sure you want to delete this project?')) {
             setIsDeleting(true)
@@ -22,7 +23,6 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
         }
     }
 
-    // Color schemes matching the Demo's design!
     const scaleColors = {
         'Short-term': 'bg-orange-100 text-orange-700',
         'Medium-term': 'bg-blue-100 text-blue-700',
@@ -43,60 +43,69 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
         'Low': 'bg-green-500'
     }
 
+    // Check if project has complete NPV data
+    const hasNPVData = project.expected_revenue && project.actual_costs && project.duration
+
     return (
-        <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200 border border-gray-100 group">
-            {/* Header with priority indicator and actions */}
-            <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${priorityColors[project.priority]}`} />
-                    <h3 className="font-semibold text-gray-800">{project.name}</h3>
+        <>
+            <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-200 border border-gray-100 group">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${priorityColors[project.priority]}`} />
+                        <h3 className="font-semibold text-gray-800">{project.name}</h3>
+                    </div>
+
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                            onClick={() => onEdit(project)}
+                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                            title="Edit"
+                        >
+                            <Edit2 className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="p-1.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+                            title="Delete"
+                        >
+                            <Trash2 className="w-4 h-4 text-gray-600" />
+                        </button>
+                    </div>
                 </div>
 
-                {/* Edit and Delete buttons - only visible on hover */}
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={() => onEdit(project)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                        title="Edit"
-                    >
-                        ✏️
-                    </button>
-                    <button
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="p-1 hover:bg-red-50 rounded"
-                        title="Delete"
-                    >
-                        🗑️
-                    </button>
-                </div>
-            </div>
+                {/* Description */}
+                {project.details && (
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{project.details}</p>
+                )}
 
-            {/* Project details */}
-            <p className="text-sm text-gray-600 mb-4">
-                {project.details || <em className="text-gray-400">No details provided</em>}
-            </p>
-
-            {/* Tags and metadata */}
-            <div className="space-y-3">
-                <div className="flex gap-2 flex-wrap">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${scaleColors[project.scale]}`}>
+                {/* Status and Scale Badges */}
+                <div className="flex gap-2 mb-3">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${scaleColors[project.scale]}`}>
                         {project.scale}
                     </span>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[project.status]}`}>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[project.status]}`}>
                         {project.status}
                     </span>
                 </div>
 
-                <div className="space-y-1 text-sm text-gray-600">
+                {/* Project Info */}
+                <div className="space-y-1 text-sm text-gray-600 mb-3">
                     {project.owner && (
-                        <div><span className="font-medium">Owner:</span> {project.owner}</div>
+                        <div>
+                            <span className="font-medium">Owner:</span> {project.owner}
+                        </div>
                     )}
                     {project.duration && (
-                        <div><span className="font-medium">Duration:</span> {project.duration} months</div>
+                        <div>
+                            <span className="font-medium">Duration:</span> {project.duration} months
+                        </div>
                     )}
                     {project.start_date && (
-                        <div><span className="font-medium">Start:</span> {new Date(project.start_date).toLocaleDateString()}</div>
+                        <div>
+                            <span className="font-medium">Start:</span> {new Date(project.start_date).toLocaleDateString()}
+                        </div>
                     )}
                 </div>
 
@@ -106,6 +115,7 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
                     </div>
                 )}
 
+                {/* Financial Section */}
                 {(project.budget || project.npv !== undefined) && (
                     <div className="pt-3 mt-3 border-t border-gray-200">
                         <div className="text-xs font-medium text-gray-500 mb-2">Financial</div>
@@ -131,9 +141,28 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
                                 </div>
                             )}
                         </div>
+
+                        {/* NPV Analysis Button */}
+                        {hasNPVData && (
+                            <button
+                                onClick={() => setShowNPVModal(true)}
+                                className="mt-3 w-full py-2 px-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-medium rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                            >
+                                <BarChart3 className="w-4 h-4" />
+                                View NPV Analysis
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
-        </div>
+
+            {/* NPV Modal */}
+            {showNPVModal && (
+                <NPVModal
+                    project={project}
+                    onClose={() => setShowNPVModal(false)}
+                />
+            )}
+        </>
     )
 }

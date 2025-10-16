@@ -8,9 +8,17 @@ import { CompanyService } from '@/lib/services/company'
 import { Project, Company } from '@/types/project'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { formatCurrency } from '@/lib/utils/calculations'
+import { formatCurrency } from '@/lib/utils/currency'
+import { PortfolioDonut } from '@/components/charts/PortfolioDonut'
+import { BudgetChart } from '@/components/charts/BudgetChart'
+import { CurrencySelector } from '@/components/ui/CurrencySelector'
+import { useCurrency } from '@/lib/context/CurrencyContext'
+import { Copy } from 'lucide-react'
 
 export default function DashboardPage() {
+    // Currency hook - MUST be at component level
+    const { currency } = useCurrency()
+
     // State management
     const [projects, setProjects] = useState<Project[]>([])
     const [filteredProjects, setFilteredProjects] = useState<Project[]>([])
@@ -121,6 +129,7 @@ export default function DashboardPage() {
         try {
             const updated = await projectService.updateProject(editingProject.id, data)
             setProjects(projects.map(p => p.id === updated.id ? updated : p))
+            setShowForm(false)
             setEditingProject(undefined)
         } catch (error) {
             console.error('Error updating project:', error)
@@ -203,16 +212,19 @@ export default function DashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        {/* Currency Selector - NEW! */}
+                        <CurrencySelector />
+
                         {/* Access Code Display */}
-                        <div className="bg-gray-50 px-3 py-2 rounded-lg">
+                        <div className="bg-gray-50 px-3 py-2 rounded-lg flex items-center gap-2">
                             <span className="text-xs text-gray-500">Access Code: </span>
                             <span className="font-mono font-bold text-indigo-600">{company?.access_code}</span>
                             <button
                                 onClick={copyAccessCode}
-                                className="ml-2 text-xs text-indigo-600 hover:text-indigo-700"
+                                className="text-indigo-600 hover:text-indigo-700 transition-colors"
                                 title="Copy code"
                             >
-                                📋
+                                <Copy className="w-3.5 h-3.5" />
                             </button>
                         </div>
                         <button
@@ -224,7 +236,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Header - matching your SO's design! */}
+                {/* Header */}
                 <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">
                     Project Scale & Prioritization Dashboard
                 </h1>
@@ -232,6 +244,7 @@ export default function DashboardPage() {
                     Strategically visualize and manage all internal projects.
                 </p>
 
+                {/* Stats Cards - NOW WITH CURRENCY! */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
                     <div className="bg-blue-100 p-4 rounded-xl flex flex-col items-center justify-center">
                         <div className="text-3xl font-bold text-blue-600 mb-1">{stats.total}</div>
@@ -250,12 +263,14 @@ export default function DashboardPage() {
                         <div className="text-xs font-medium text-orange-800 text-center">Short-Term</div>
                     </div>
                     <div className="bg-cyan-100 p-4 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-2xl font-bold text-cyan-600 mb-1">{formatCurrency(stats.totalBudget)}</div>
+                        <div className="text-2xl font-bold text-cyan-600 mb-1">
+                            {formatCurrency(stats.totalBudget, currency)}
+                        </div>
                         <div className="text-xs font-medium text-cyan-800 text-center">Total Budget</div>
                     </div>
                     <div className={`p-4 rounded-xl flex flex-col items-center justify-center ${stats.totalNPV >= 0 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
                         <div className={`text-2xl font-bold mb-1 ${stats.totalNPV >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {formatCurrency(stats.totalNPV)}
+                            {formatCurrency(stats.totalNPV, currency)}
                         </div>
                         <div className={`text-xs font-medium text-center ${stats.totalNPV >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
                             Portfolio NPV
@@ -263,6 +278,7 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
+                {/* Filters */}
                 <div className="mb-6">
                     <div className="text-sm font-medium text-gray-700 mb-2">Filter by Scale:</div>
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -373,6 +389,37 @@ export default function DashboardPage() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
+                </div>
+
+                {/* Analytics Section */}
+                <div className="mb-8">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Portfolio Analytics</h2>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Project Distribution by Status */}
+                        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                Project Status Distribution
+                            </h3>
+                            <PortfolioDonut projects={projects} type="status" />
+                        </div>
+
+                        {/* Project Distribution by Priority */}
+                        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                Priority Distribution
+                            </h3>
+                            <PortfolioDonut projects={projects} type="priority" />
+                        </div>
+
+                        {/* Budget vs Actual Comparison */}
+                        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 lg:col-span-2">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                Budget vs Actual Costs
+                            </h3>
+                            <BudgetChart projects={projects} />
+                        </div>
+                    </div>
                 </div>
 
                 {/* Projects Grid */}

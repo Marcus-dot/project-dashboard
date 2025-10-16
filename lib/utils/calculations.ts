@@ -1,3 +1,7 @@
+// Re-export currency utilities for backward compatibility
+export { formatCurrency, formatPercentage, formatCompactNumber } from './currency'
+export type { Currency } from './currency'
+
 export function calculateNPV(
   expectedRevenue: number,
   actualCosts: number,
@@ -51,16 +55,6 @@ export function getRiskLevel(score: number): { label: string; color: string } {
   if (score >= 70) return { label: 'High Risk', color: 'red' }
   if (score >= 40) return { label: 'Medium Risk', color: 'yellow' }
   return { label: 'Low Risk', color: 'green' }
-}
-
-export function formatCurrency(amount?: number): string {
-  if (amount === undefined || amount === null) return '$0'
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
 }
 
 export function calculateResourceUtilization(
