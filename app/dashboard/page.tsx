@@ -14,6 +14,8 @@ import { BudgetChart } from '@/components/charts/BudgetChart'
 import { CurrencySelector } from '@/components/ui/CurrencySelector'
 import { useCurrency } from '@/lib/context/CurrencyContext'
 import { Copy } from 'lucide-react'
+import Link from 'next/link'
+import { FileText } from 'lucide-react'
 
 export default function DashboardPage() {
     // Currency hook - MUST be at component level
@@ -361,10 +363,31 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
+                {/* Search Bar */}
+                <div className="mb-6">
+                    <input
+                        type="text"
+                        placeholder="Search projects..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                </div>
+
+                {/* Action Buttons - UPDATED! */}
                 <div className="flex flex-col sm:flex-row items-center justify-between mb-6 space-y-4 sm:space-y-0">
                     <div></div>
 
                     <div className="flex space-x-2">
+                        {/* NEW: Reports Button */}
+                        <Link
+                            href="/reports"
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                            <FileText className="w-4 h-4" />
+                            Reports
+                        </Link>
+
                         <button
                             onClick={handleExport}
                             className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
@@ -380,16 +403,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Search Bar */}
-                <div className="mb-6">
-                    <input
-                        type="text"
-                        placeholder="Search projects..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                </div>
 
                 {/* Analytics Section */}
                 <div className="mb-8">
