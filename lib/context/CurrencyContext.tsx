@@ -12,11 +12,9 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
     const [currency, setCurrencyState] = useState<Currency>('ZMW')
-    const [mounted, setMounted] = useState(false)
 
-    // Load saved currency preference on mount
+    // Load saved currency preference on mount (client-side only)
     useEffect(() => {
-        setMounted(true)
         const savedCurrency = getDefaultCurrency()
         setCurrencyState(savedCurrency)
     }, [])
@@ -26,11 +24,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         saveCurrencyPreference(newCurrency)
     }
 
-    // Prevent hydration mismatch by not rendering until mounted
-    if (!mounted) {
-        return <>{children}</>
-    }
-
+    // Always render with Provider - no conditional rendering!
     return (
         <CurrencyContext.Provider value={{ currency, setCurrency }}>
             {children}
