@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { calculateNPV, calculateCumulativeNPV } from '@/lib/utils/calculations';
+import { calculateNPV } from '@/lib/utils/calculations';
 
 // GET: Fetch all user's NPV calculations
 export async function GET(request: NextRequest) {
@@ -47,26 +47,37 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid input parameters' }, { status: 400 });
         }
 
-        // Get user's company for currency
-        const { data: profile } = await supabase
+        // Get user's profile (simplified - just company_id)
+        const { data: profile, error: profileError } = await supabase
             .from('profiles')
-            .select(`
-        company_id,
-        companies:company_id (
-          currency
-        )
-      `)
-            .eq('user_id', user.id)
+            .select('company_id')
+            .eq('id', user.id)
             .single();
+
+        if (profileError) {
+            console.error('Profile error:', profileError);
+            return NextResponse.json({ error: 'Failed to fetch user profile' }, { status: 500 });
+        }
 
         if (!profile?.company_id) {
             return NextResponse.json({ error: 'User has no company' }, { status: 400 });
         }
 
-        // Extract currency
-        const companyArray = profile.companies as { currency?: string }[] | { currency?: string } | null | undefined;
-        const companyData = Array.isArray(companyArray) ? companyArray[0] : companyArray;
-        const currency = companyData?.currency ?? 'ZMW';
+        // Separate query for company data
+        let currency = 'ZMW'; // Default fallback
+
+        const { data: company, error: companyError } = await supabase
+            .from('companies')
+            .select('currency')
+            .eq('id', profile.company_id)
+            .single();
+
+        if (companyError) {
+            console.error('Company query error:', companyError);
+            // Continue with default currency instead of failing
+        } else if (company?.currency) {
+            currency = company.currency;
+        }
 
         // Calculate NPV
         const npv = calculateNPV(initial_investment, discount_rate, cash_flows);

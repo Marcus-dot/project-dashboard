@@ -1,6 +1,7 @@
 // This service handles all company-related operations
 import { createClient } from '@/lib/supabase/client'
-import type { Company, Profile } from '@/types/project'
+import type { Company } from '@/types/company'
+import type { Profile } from '@/types/project'
 
 export class CompanyService {
     private supabase = createClient()
@@ -21,17 +22,32 @@ export class CompanyService {
     }
 
     // FUNCTION 2: Create a new company
-    async createCompany(name: string, accessCode: string) {
+    async createCompany(
+        name: string,
+        accessCode: string,
+        options?: {
+            currency?: string;
+            country?: string;
+            timezone?: string;
+            industry?: string;
+            size?: string;
+        }
+    ) {
         const { data: { user } } = await this.supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
 
-        // Insert the company (don't try to select immediately)
+        // Insert the company with new fields
         const { data, error } = await this.supabase
             .from('companies')
             .insert({
                 name,
                 access_code: accessCode,
-                created_by: user.id
+                created_by: user.id,
+                currency: options?.currency || 'ZMW',
+                country: options?.country || 'Zambia',
+                timezone: options?.timezone || 'Africa/Lusaka',
+                industry: options?.industry || null,
+                size: options?.size || null
             })
             .select()
 
@@ -52,13 +68,18 @@ export class CompanyService {
 
             if (fetchError || !company) {
                 // Last resort: return a minimal company object
-                // The joinCompany step will ensure the user gets linked
                 return {
-                    id: '', // Will be populated when we join
+                    id: '',
                     name,
                     access_code: accessCode,
                     created_by: user.id,
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    currency: options?.currency || 'ZMW',
+                    country: options?.country || 'Zambia',
+                    timezone: options?.timezone || 'Africa/Lusaka',
+                    industry: options?.industry || null,
+                    size: options?.size || null,
+                    updated_at: new Date().toISOString()
                 } as Company
             }
 
@@ -162,5 +183,54 @@ export class CompanyService {
             .eq('id', user.id)
 
         if (error) throw error
+    }
+
+    // FUNCTION 8: Update company details (NEW)
+    async updateCompany(
+        companyId: string,
+        updates: {
+            name?: string;
+            currency?: string;
+            country?: string;
+            timezone?: string;
+            industry?: string;
+            size?: string;
+        }
+    ) {
+        const { data: { user } } = await this.supabase.auth.getUser()
+        if (!user) throw new Error('Not authenticated')
+
+        const { data, error } = await this.supabase
+            .from('companies')
+            .update({
+                ...updates,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', companyId)
+            .select()
+            .single()
+
+        if (error) {
+            console.error('Company update error:', error)
+            throw new Error(error.message || 'Failed to update company')
+        }
+
+        return data as Company
+    }
+
+    // FUNCTION 9: Get company localization settings (NEW)
+    async getCompanyLocalization(companyId: string) {
+        const { data, error } = await this.supabase
+            .from('companies')
+            .select('currency, country, timezone')
+            .eq('id', companyId)
+            .single()
+
+        if (error) {
+            console.error('Error fetching company localization:', error)
+            return null
+        }
+
+        return data as { currency: string; country: string; timezone: string }
     }
 }
