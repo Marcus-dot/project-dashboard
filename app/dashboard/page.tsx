@@ -15,7 +15,7 @@ import { CurrencySelector } from '@/components/ui/CurrencySelector'
 import { useCurrency } from '@/lib/context/CurrencyContext'
 import { Copy } from 'lucide-react'
 import Link from 'next/link'
-import { FileText } from 'lucide-react'
+import { FileText, Calculator } from 'lucide-react'
 
 export default function DashboardPage() {
     // Currency hook - MUST be at component level
@@ -379,7 +379,16 @@ export default function DashboardPage() {
                     <div></div>
 
                     <div className="flex space-x-2">
-                        {/* NEW: Reports Button */}
+                        {/* NEW: Tools Button */}
+                        <Link
+                            href="/tools/npv-calculator"
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                        >
+                            <Calculator className="w-4 h-4" />
+                            Tools
+                        </Link>
+
+                        {/* Reports Button */}
                         <Link
                             href="/reports"
                             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
