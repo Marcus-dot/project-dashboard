@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Calculator, TrendingUp, TrendingDown, Save, History, Plus, Trash2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -126,6 +127,9 @@ export default function NPVCalculatorPage() {
     const handleSaveCalculation = async () => {
         setIsSaving(true);
 
+        // Show loading toast
+        const loadingToast = toast.loading('Saving calculation...');
+
         const saved = await saveNPVCalculation({
             initial_investment: initialInvestment,
             discount_rate: discountRate,
@@ -138,9 +142,20 @@ export default function NPVCalculatorPage() {
             const calculations = await getUserNPVCalculations();
             setSavedCalculations(calculations);
             setCalculationName('');
-            alert('Calculation saved successfully!');
+
+            // Show success toast
+            toast.success('Calculation saved successfully!', {
+                id: loadingToast,
+                description: 'You can view it in the History sidebar',
+                duration: 4000
+            });
         } else {
-            alert('Failed to save calculation. Please try again.');
+            // Show error toast
+            toast.error('Failed to save calculation', {
+                id: loadingToast,
+                description: 'Please check your connection and try again',
+                duration: 5000
+            });
         }
 
         setIsSaving(false);
@@ -153,17 +168,49 @@ export default function NPVCalculatorPage() {
         setCashFlows(calc.cash_flows);
         setProjectDuration(calc.cash_flows.length);
         setShowHistory(false);
+
+        // Show success toast
+        toast.success('Calculation loaded', {
+            description: `Loaded "${calc.calculation_name || 'Unnamed Calculation'}"`,
+            duration: 3000
+        });
     };
 
     // Delete a saved calculation
-    const handleDeleteCalculation = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this calculation?')) return;
+    const handleDeleteCalculation = async (id: string, name?: string) => {
+        // Show confirmation toast with action buttons
+        toast.error(`Delete "${name || 'this calculation'}"?`, {
+            description: 'This action cannot be undone',
+            duration: 6000,
+            action: {
+                label: 'Delete',
+                onClick: async () => {
+                    const deleted = await deleteNPVCalculation(id);
+                    if (deleted) {
+                        const calculations = await getUserNPVCalculations();
+                        setSavedCalculations(calculations);
 
-        const deleted = await deleteNPVCalculation(id);
-        if (deleted) {
-            const calculations = await getUserNPVCalculations();
-            setSavedCalculations(calculations);
-        }
+                        // Show success toast
+                        toast.success('Calculation deleted', {
+                            description: 'Removed from your history',
+                            duration: 3000
+                        });
+                    } else {
+                        // Show error toast
+                        toast.error('Failed to delete', {
+                            description: 'Please try again',
+                            duration: 4000
+                        });
+                    }
+                }
+            },
+            cancel: {
+                label: 'Cancel',
+                onClick: () => {
+                    toast.dismiss();
+                }
+            }
+        });
     };
 
     // Reset to defaults
@@ -173,6 +220,12 @@ export default function NPVCalculatorPage() {
         setProjectDuration(5);
         setCashFlows([30000, 35000, 40000, 40000, 35000]);
         setCalculationName('');
+
+        // Show info toast
+        toast.info('Reset to defaults', {
+            description: 'All values have been restored',
+            duration: 2000
+        });
     };
 
     // Format currency
@@ -523,7 +576,7 @@ export default function NPVCalculatorPage() {
                                                         size="icon"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleDeleteCalculation(calc.id);
+                                                            handleDeleteCalculation(calc.id, calc.calculation_name || undefined);
                                                         }}
                                                         className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
                                                     >
