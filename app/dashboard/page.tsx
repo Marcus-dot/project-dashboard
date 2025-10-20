@@ -13,12 +13,31 @@ import { PortfolioDonut } from '@/components/charts/PortfolioDonut'
 import { BudgetChart } from '@/components/charts/BudgetChart'
 import { CurrencySelector } from '@/components/ui/CurrencySelector'
 import { useCurrency } from '@/lib/context/CurrencyContext'
-import { Copy } from 'lucide-react'
+import {
+    Copy,
+    FileText,
+    Calculator,
+    AlertTriangle,
+    Plus,
+    Download,
+    Search,
+    TrendingUp,
+    TrendingDown,
+    Activity,
+    Layers,
+    BarChart3,
+    LogOut,
+    Building2,
+    User
+} from 'lucide-react'
 import Link from 'next/link'
-import { FileText, Calculator } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 
 export default function DashboardPage() {
-    // Currency hook - MUST be at component level
+    // Currency hook
     const { currency } = useCurrency()
 
     // State management
@@ -31,15 +50,16 @@ export default function DashboardPage() {
     const [currentFilter, setCurrentFilter] = useState('all')
     const [priorityFilter, setPriorityFilter] = useState('all')
     const [company, setCompany] = useState<Company | null>(null)
+    const [showToolsDropdown, setShowToolsDropdown] = useState(false)
 
-    // Create instances of our services
+    // Services
     const projectService = new ProjectService()
     const companyService = new CompanyService()
     const supabase = createClient()
     const router = useRouter()
     const [userEmail, setUserEmail] = useState<string>('')
 
-    // Load projects and company info when page loads
+    // Load projects and company info
     useEffect(() => {
         initializeDashboard()
     }, [])
@@ -48,10 +68,8 @@ export default function DashboardPage() {
         filterProjects()
     }, [projects, searchTerm, currentFilter, priorityFilter])
 
-    // Initialize dashboard - check auth, company, and load projects
     const initializeDashboard = async () => {
         try {
-            // Check if user is authenticated
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) {
                 router.push('/auth/login')
@@ -60,17 +78,13 @@ export default function DashboardPage() {
 
             setUserEmail(user.email || '')
 
-            // Check if user has a company
             const userCompany = await companyService.getUserCompany()
             if (!userCompany) {
-                // No company - redirect to company setup
                 router.push('/company-setup')
                 return
             }
 
             setCompany(userCompany)
-
-            // Load projects for the company
             await loadProjects()
         } catch (error) {
             console.error('Error initializing dashboard:', error)
@@ -79,7 +93,6 @@ export default function DashboardPage() {
         }
     }
 
-    // FUNCTION: Load all projects from database
     const loadProjects = async () => {
         try {
             const data = await projectService.getProjects()
@@ -112,7 +125,6 @@ export default function DashboardPage() {
         setFilteredProjects(filtered)
     }
 
-    // FUNCTION: Create a new project
     const handleCreateProject = async (data: Partial<Project>) => {
         try {
             const newProject = await projectService.createProject(data)
@@ -124,7 +136,6 @@ export default function DashboardPage() {
         }
     }
 
-    // FUNCTION: Update an existing project
     const handleUpdateProject = async (data: Partial<Project>) => {
         if (!editingProject) return
 
@@ -139,7 +150,6 @@ export default function DashboardPage() {
         }
     }
 
-    // FUNCTION: Delete a project
     const handleDeleteProject = async (id: string) => {
         try {
             await projectService.deleteProject(id)
@@ -150,7 +160,6 @@ export default function DashboardPage() {
         }
     }
 
-    // FUNCTION: Export projects as JSON
     const handleExport = () => {
         const exportData = {
             company: company?.name,
@@ -167,13 +176,11 @@ export default function DashboardPage() {
         URL.revokeObjectURL(url)
     }
 
-    // FUNCTION: Handle logout
     const handleLogout = async () => {
         await supabase.auth.signOut()
         router.push('/')
     }
 
-    // FUNCTION: Copy access code to clipboard
     const copyAccessCode = () => {
         if (company?.access_code) {
             navigator.clipboard.writeText(company.access_code)
@@ -191,307 +198,430 @@ export default function DashboardPage() {
         highPriority: projects.filter(p => p.priority === 'High').length,
     }
 
-    // Show loading state
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="text-gray-500">Loading dashboard...</div>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+                <div className="text-gray-500 dark:text-gray-400">Loading dashboard...</div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 p-4 sm:p-8">
-            <div className="bg-white p-8 rounded-2xl w-full max-w-7xl mx-auto">
-                {/* Company and User info bar */}
-                <div className="flex justify-between items-center mb-6 pb-4 border-b">
-                    <div>
-                        <div className="text-lg font-semibold text-gray-800">
-                            {company?.name}
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+            {/* Header Bar */}
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="flex items-center justify-between">
+                        {/* Company Info */}
+                        <div className="flex items-center gap-4">
+                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                                <Building2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                                    {company?.name}
+                                </h1>
+                                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                                    <User className="h-3 w-3" />
+                                    {userEmail}
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                            Logged in as: <span className="font-medium">{userEmail}</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {/* Currency Selector - NEW! */}
-                        <CurrencySelector />
 
-                        {/* Access Code Display */}
-                        <div className="bg-gray-50 px-3 py-2 rounded-lg flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Access Code: </span>
-                            <span className="font-mono font-bold text-indigo-600">{company?.access_code}</span>
-                            <button
-                                onClick={copyAccessCode}
-                                className="text-indigo-600 hover:text-indigo-700 transition-colors"
-                                title="Copy code"
+                        {/* Right Actions */}
+                        <div className="flex items-center gap-3">
+                            {/* Currency Selector */}
+                            <CurrencySelector />
+
+                            {/* Access Code */}
+                            <div className="hidden sm:flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Code:</span>
+                                <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                                    {company?.access_code}
+                                </span>
+                                <button
+                                    onClick={copyAccessCode}
+                                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+
+                            {/* Logout */}
+                            <Button
+                                variant="outline"
+                                onClick={handleLogout}
+                                className="flex items-center gap-2"
                             >
-                                <Copy className="w-3.5 h-3.5" />
-                            </button>
+                                <LogOut className="h-4 w-4" />
+                                <span className="hidden sm:inline">Sign Out</span>
+                            </Button>
                         </div>
-                        <button
-                            onClick={handleLogout}
-                            className="text-sm px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                        >
-                            Sign Out
-                        </button>
                     </div>
                 </div>
+            </div>
 
-                {/* Header */}
-                <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">
-                    Project Scale & Prioritization Dashboard
-                </h1>
-                <p className="text-center text-gray-500 mb-8">
-                    Strategically visualize and manage all internal projects.
-                </p>
+            {/* Main Content */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* Page Title */}
+                <div className="mb-8">
+                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                        Project Portfolio Dashboard
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400">
+                        Monitor, analyze, and manage your project portfolio
+                    </p>
+                </div>
 
-                {/* Stats Cards - NOW WITH CURRENCY! */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-                    <div className="bg-blue-100 p-4 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-3xl font-bold text-blue-600 mb-1">{stats.total}</div>
-                        <div className="text-xs font-medium text-blue-800 text-center">Total Projects</div>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        Total Projects
+                                    </p>
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                                        {stats.total}
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                                    <Layers className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        In Progress
+                                    </p>
+                                    <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                                        {stats.inProgress}
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
+                                    <Activity className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        Total Budget
+                                    </p>
+                                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+                                        {formatCurrency(stats.totalBudget, currency)}
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-cyan-100 dark:bg-cyan-900 rounded-lg">
+                                    <BarChart3 className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className={stats.totalNPV >= 0 ? 'border-emerald-200 dark:border-emerald-800' : 'border-rose-200 dark:border-rose-800'}>
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        Portfolio NPV
+                                    </p>
+                                    <p className={`text-2xl font-bold mt-2 ${stats.totalNPV >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                        {formatCurrency(stats.totalNPV, currency)}
+                                    </p>
+                                </div>
+                                <div className={`p-3 rounded-lg ${stats.totalNPV >= 0 ? 'bg-emerald-100 dark:bg-emerald-900' : 'bg-rose-100 dark:bg-rose-900'}`}>
+                                    {stats.totalNPV >= 0 ? (
+                                        <TrendingUp className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                                    ) : (
+                                        <TrendingDown className="h-6 w-6 text-rose-600 dark:text-rose-400" />
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Action Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
+                    {/* Search */}
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                            type="text"
+                            placeholder="Search projects..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-10"
+                        />
                     </div>
-                    <div className="bg-green-100 p-4 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-3xl font-bold text-green-600 mb-1">{stats.inProgress}</div>
-                        <div className="text-xs font-medium text-green-800 text-center">In Progress</div>
-                    </div>
-                    <div className="bg-red-100 p-4 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-3xl font-bold text-red-600 mb-1">{stats.highPriority}</div>
-                        <div className="text-xs font-medium text-red-800 text-center">High Priority</div>
-                    </div>
-                    <div className="bg-orange-100 p-4 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-3xl font-bold text-orange-600 mb-1">{stats.shortTerm}</div>
-                        <div className="text-xs font-medium text-orange-800 text-center">Short-Term</div>
-                    </div>
-                    <div className="bg-cyan-100 p-4 rounded-xl flex flex-col items-center justify-center">
-                        <div className="text-2xl font-bold text-cyan-600 mb-1">
-                            {formatCurrency(stats.totalBudget, currency)}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                        {/* Tools Dropdown */}
+                        <div className="relative">
+                            <Button
+                                onClick={() => setShowToolsDropdown(!showToolsDropdown)}
+                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
+                            >
+                                <Calculator className="h-4 w-4" />
+                                Tools
+                                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </Button>
+
+                            {showToolsDropdown && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-10"
+                                        onClick={() => setShowToolsDropdown(false)}
+                                    />
+                                    <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20">
+                                        <div className="py-2">
+                                            <Link
+                                                href="/tools/npv-calculator"
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                onClick={() => setShowToolsDropdown(false)}
+                                            >
+                                                <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                                                    <Calculator className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                                        NPV Calculator
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                        Financial viability analysis
+                                                    </div>
+                                                </div>
+                                            </Link>
+
+                                            <Link
+                                                href="/tools/risk-calculator"
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                onClick={() => setShowToolsDropdown(false)}
+                                            >
+                                                <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                                                    <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                                        Risk Calculator
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                        Risk assessment tool
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
-                        <div className="text-xs font-medium text-cyan-800 text-center">Total Budget</div>
-                    </div>
-                    <div className={`p-4 rounded-xl flex flex-col items-center justify-center ${stats.totalNPV >= 0 ? 'bg-emerald-100' : 'bg-rose-100'}`}>
-                        <div className={`text-2xl font-bold mb-1 ${stats.totalNPV >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {formatCurrency(stats.totalNPV, currency)}
-                        </div>
-                        <div className={`text-xs font-medium text-center ${stats.totalNPV >= 0 ? 'text-emerald-800' : 'text-rose-800'}`}>
-                            Portfolio NPV
-                        </div>
+
+                        <Link href="/reports">
+                            <Button variant="outline" className="flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                <span className="hidden sm:inline">Reports</span>
+                            </Button>
+                        </Link>
+
+                        <Button
+                            variant="outline"
+                            onClick={handleExport}
+                            className="flex items-center gap-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">Export</span>
+                        </Button>
+
+                        <Button
+                            onClick={() => setShowForm(true)}
+                            className="flex items-center gap-2"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add Project
+                        </Button>
                     </div>
                 </div>
 
                 {/* Filters */}
-                <div className="mb-6">
-                    <div className="text-sm font-medium text-gray-700 mb-2">Filter by Scale:</div>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        <button
-                            onClick={() => setCurrentFilter('all')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'all'
-                                ? 'bg-gray-300 text-gray-700'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                }`}
-                        >
-                            All
-                        </button>
-                        <button
-                            onClick={() => setCurrentFilter('Short-term')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'Short-term'
-                                ? 'bg-orange-300 text-orange-800'
-                                : 'bg-orange-200 text-orange-800 hover:bg-orange-300'
-                                }`}
-                        >
-                            Short-Term
-                        </button>
-                        <button
-                            onClick={() => setCurrentFilter('Medium-term')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'Medium-term'
-                                ? 'bg-blue-300 text-blue-800'
-                                : 'bg-blue-200 text-blue-800 hover:bg-blue-300'
-                                }`}
-                        >
-                            Medium-Term
-                        </button>
-                        <button
-                            onClick={() => setCurrentFilter('Long-term')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${currentFilter === 'Long-term'
-                                ? 'bg-gray-300 text-gray-800'
-                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                                }`}
-                        >
-                            Long-Term
-                        </button>
-                    </div>
+                <Card className="mb-6">
+                    <CardContent className="p-6">
+                        <div className="space-y-4">
+                            {/* Scale Filter */}
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                    Filter by Scale
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    <Badge
+                                        variant={currentFilter === 'all' ? 'default' : 'outline'}
+                                        className="cursor-pointer"
+                                        onClick={() => setCurrentFilter('all')}
+                                    >
+                                        All
+                                    </Badge>
+                                    <Badge
+                                        variant={currentFilter === 'Short-term' ? 'default' : 'outline'}
+                                        className="cursor-pointer bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-200"
+                                        onClick={() => setCurrentFilter('Short-term')}
+                                    >
+                                        Short-Term
+                                    </Badge>
+                                    <Badge
+                                        variant={currentFilter === 'Medium-term' ? 'default' : 'outline'}
+                                        className="cursor-pointer bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200"
+                                        onClick={() => setCurrentFilter('Medium-term')}
+                                    >
+                                        Medium-Term
+                                    </Badge>
+                                    <Badge
+                                        variant={currentFilter === 'Long-term' ? 'default' : 'outline'}
+                                        className="cursor-pointer bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200"
+                                        onClick={() => setCurrentFilter('Long-term')}
+                                    >
+                                        Long-Term
+                                    </Badge>
+                                </div>
+                            </div>
 
-                    <div className="text-sm font-medium text-gray-700 mb-2">Filter by Priority:</div>
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => setPriorityFilter('all')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'all'
-                                ? 'bg-gray-300 text-gray-700'
-                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                }`}
-                        >
-                            All
-                        </button>
-                        <button
-                            onClick={() => setPriorityFilter('High')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'High'
-                                ? 'bg-red-300 text-red-800'
-                                : 'bg-red-200 text-red-800 hover:bg-red-300'
-                                }`}
-                        >
-                            High Priority
-                        </button>
-                        <button
-                            onClick={() => setPriorityFilter('Medium')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'Medium'
-                                ? 'bg-yellow-300 text-yellow-800'
-                                : 'bg-yellow-200 text-yellow-800 hover:bg-yellow-300'
-                                }`}
-                        >
-                            Medium Priority
-                        </button>
-                        <button
-                            onClick={() => setPriorityFilter('Low')}
-                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${priorityFilter === 'Low'
-                                ? 'bg-green-300 text-green-800'
-                                : 'bg-green-200 text-green-800 hover:bg-green-300'
-                                }`}
-                        >
-                            Low Priority
-                        </button>
-                    </div>
-                </div>
-
-                {/* Search Bar */}
-                <div className="mb-6">
-                    <input
-                        type="text"
-                        placeholder="Search projects..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                </div>
-
-                {/* Action Buttons - UPDATED! */}
-                <div className="flex flex-col sm:flex-row items-center justify-between mb-6 space-y-4 sm:space-y-0">
-                    <div></div>
-
-                    <div className="flex space-x-2">
-                        {/* NEW: Tools Button */}
-                        <Link
-                            href="/tools/npv-calculator"
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-                        >
-                            <Calculator className="w-4 h-4" />
-                            Tools
-                        </Link>
-
-                        {/* Reports Button */}
-                        <Link
-                            href="/reports"
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                        >
-                            <FileText className="w-4 h-4" />
-                            Reports
-                        </Link>
-
-                        <button
-                            onClick={handleExport}
-                            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                            📥 Export
-                        </button>
-                        <button
-                            onClick={() => setShowForm(true)}
-                            className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors"
-                        >
-                            Add New Project
-                        </button>
-                    </div>
-                </div>
-
+                            {/* Priority Filter */}
+                            <div>
+                                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                    Filter by Priority
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    <Badge
+                                        variant={priorityFilter === 'all' ? 'default' : 'outline'}
+                                        className="cursor-pointer"
+                                        onClick={() => setPriorityFilter('all')}
+                                    >
+                                        All
+                                    </Badge>
+                                    <Badge
+                                        variant={priorityFilter === 'High' ? 'default' : 'outline'}
+                                        className="cursor-pointer bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900 dark:text-red-200"
+                                        onClick={() => setPriorityFilter('High')}
+                                    >
+                                        High Priority
+                                    </Badge>
+                                    <Badge
+                                        variant={priorityFilter === 'Medium' ? 'default' : 'outline'}
+                                        className="cursor-pointer bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-200"
+                                        onClick={() => setPriorityFilter('Medium')}
+                                    >
+                                        Medium Priority
+                                    </Badge>
+                                    <Badge
+                                        variant={priorityFilter === 'Low' ? 'default' : 'outline'}
+                                        className="cursor-pointer bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900 dark:text-green-200"
+                                        onClick={() => setPriorityFilter('Low')}
+                                    >
+                                        Low Priority
+                                    </Badge>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Analytics Section */}
-                <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Portfolio Analytics</h2>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Project Distribution by Status */}
-                        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                                Project Status Distribution
-                            </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Project Status Distribution</CardTitle>
+                            <CardDescription>Overview of project statuses</CardDescription>
+                        </CardHeader>
+                        <CardContent>
                             <PortfolioDonut projects={projects} type="status" />
-                        </div>
+                        </CardContent>
+                    </Card>
 
-                        {/* Project Distribution by Priority */}
-                        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                                Priority Distribution
-                            </h3>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Priority Distribution</CardTitle>
+                            <CardDescription>Projects by priority level</CardDescription>
+                        </CardHeader>
+                        <CardContent>
                             <PortfolioDonut projects={projects} type="priority" />
-                        </div>
+                        </CardContent>
+                    </Card>
 
-                        {/* Budget vs Actual Comparison */}
-                        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 lg:col-span-2">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                                Budget vs Actual Costs
-                            </h3>
+                    <Card className="lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle>Budget vs Actual Costs</CardTitle>
+                            <CardDescription>Financial performance tracking</CardDescription>
+                        </CardHeader>
+                        <CardContent>
                             <BudgetChart projects={projects} />
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Projects Section */}
+                <div className="mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                        Projects ({filteredProjects.length})
+                    </h3>
+
+                    {filteredProjects.length === 0 ? (
+                        <Card>
+                            <CardContent className="p-12 text-center">
+                                <Layers className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                                    {searchTerm || currentFilter !== 'all' || priorityFilter !== 'all'
+                                        ? 'No projects match your filters'
+                                        : 'No projects yet'}
+                                </p>
+                                {projects.length === 0 && (
+                                    <Button onClick={() => setShowForm(true)}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Create Your First Project
+                                    </Button>
+                                )}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredProjects.map(project => (
+                                <ProjectCard
+                                    key={project.id}
+                                    project={project}
+                                    onEdit={(p) => {
+                                        setEditingProject(p)
+                                        setShowForm(true)
+                                    }}
+                                    onDelete={handleDeleteProject}
+                                />
+                            ))}
                         </div>
-                    </div>
+                    )}
                 </div>
-
-                {/* Projects Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredProjects.map(project => (
-                        <ProjectCard
-                            key={project.id}
-                            project={project}
-                            onEdit={(p) => {
-                                setEditingProject(p)
-                                setShowForm(true)
-                            }}
-                            onDelete={handleDeleteProject}
-                        />
-                    ))}
-                </div>
-
-                {/* Empty state */}
-                {filteredProjects.length === 0 && (
-                    <div className="text-center py-12">
-                        <p className="text-gray-500 mb-4">
-                            {searchTerm || currentFilter !== 'all'
-                                ? 'No projects found matching your criteria'
-                                : 'No projects yet. Click "Add New Project" to get started!'}
-                        </p>
-                        {projects.length === 0 && company && (
-                            <div className="mt-6 p-4 bg-indigo-50 rounded-lg max-w-md mx-auto">
-                                <p className="text-sm text-indigo-800 mb-2">
-                                    👥 Invite your team to collaborate!
-                                </p>
-                                <p className="text-xs text-indigo-600">
-                                    Share this access code: <span className="font-mono font-bold">{company.access_code}</span>
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Show form modal when needed */}
-                {showForm && (
-                    <ProjectForm
-                        project={editingProject}
-                        onSubmit={editingProject ? handleUpdateProject : handleCreateProject}
-                        onCancel={() => {
-                            setShowForm(false)
-                            setEditingProject(undefined)
-                        }}
-                    />
-                )}
             </div>
+
+            {/* Project Form Modal */}
+            {showForm && (
+                <ProjectForm
+                    project={editingProject}
+                    onSubmit={editingProject ? handleUpdateProject : handleCreateProject}
+                    onCancel={() => {
+                        setShowForm(false)
+                        setEditingProject(undefined)
+                    }}
+                />
+            )}
         </div>
     )
 }
