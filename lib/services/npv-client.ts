@@ -70,3 +70,24 @@ export async function deleteNPVCalculation(id: string): Promise<boolean> {
         return false;
     }
 }
+
+// NEW: Link NPV calculation to project
+export async function linkNPVToProject(calculationId: string, projectId: string): Promise<boolean> {
+    try {
+        const response = await fetch('/api/npv/link-to-project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ calculation_id: calculationId, project_id: projectId })
+        });
+
+        if (!response.ok) {
+            console.error('Error linking NPV to project');
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error('linkNPVToProject error:', error);
+        return false;
+    }
+}

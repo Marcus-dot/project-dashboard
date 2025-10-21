@@ -1,20 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, AlertTriangle, Save, History, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, AlertTriangle, Save, History, Trash2, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProjectSelector } from '@/components/ui/ProjectSelector';
 import { calculateRiskScore } from '@/lib/utils/calculations';
-import { saveRiskAssessment, getUserRiskAssessments, deleteRiskAssessment } from '@/lib/services/risk-client';
+import { saveRiskAssessment, getUserRiskAssessments, deleteRiskAssessment, linkRiskToProject } from '@/lib/services/risk-client';
 import { getRiskLevelFromScore, getRiskRecommendations, RISK_FACTORS, RISK_WEIGHTS } from '@/types/risk';
 import type { RiskAssessment } from '@/types/risk';
 
 export default function RiskCalculatorPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     // Risk factors state (0-100 scale)
     const [budgetVariance, setBudgetVariance] = useState<number>(30);
@@ -22,6 +24,7 @@ export default function RiskCalculatorPage() {
     const [resourceAvailability, setResourceAvailability] = useState<number>(20);
     const [complexity, setComplexity] = useState<number>(40);
     const [stakeholderAlignment, setStakeholderAlignment] = useState<number>(15);
+    const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
 
     // Results state
     const [riskScore, setRiskScore] = useState<number>(0);
@@ -34,6 +37,14 @@ export default function RiskCalculatorPage() {
     const [showHistory, setShowHistory] = useState(false);
     const [savedAssessments, setSavedAssessments] = useState<RiskAssessment[]>([]);
     const [assessmentName, setAssessmentName] = useState<string>('');
+
+    // Check for project ID in URL on mount
+    useEffect(() => {
+        const projectId = searchParams.get('project');
+        if (projectId) {
+            setSelectedProjectId(projectId);
+        }
+    }, [searchParams]);
 
     // Load saved assessments
     useEffect(() => {
@@ -82,19 +93,38 @@ export default function RiskCalculatorPage() {
             resource_availability: resourceAvailability,
             complexity: complexity,
             stakeholder_alignment: stakeholderAlignment,
-            assessment_name: assessmentName || `Risk Assessment - ${new Date().toLocaleDateString()}`
+            assessment_name: assessmentName || `Risk Assessment - ${new Date().toLocaleDateString()}`,
+            project_id: selectedProjectId
         });
 
         if (saved) {
+            // Link to project if selected
+            if (selectedProjectId) {
+                const linked = await linkRiskToProject(saved.id, selectedProjectId);
+                if (linked) {
+                    toast.success('Risk assessment linked to project!', {
+                        id: loadingToast,
+                        description: 'Assessment saved and project health score updated',
+                        duration: 4000
+                    });
+                } else {
+                    toast.warning('Assessment saved but linking failed', {
+                        id: loadingToast,
+                        description: 'You can manually link it later',
+                        duration: 4000
+                    });
+                }
+            } else {
+                toast.success('Assessment saved successfully!', {
+                    id: loadingToast,
+                    description: 'You can view it in the History sidebar',
+                    duration: 4000
+                });
+            }
+
             const assessments = await getUserRiskAssessments();
             setSavedAssessments(assessments);
             setAssessmentName('');
-
-            toast.success('Assessment saved successfully!', {
-                id: loadingToast,
-                description: 'You can view it in the History sidebar',
-                duration: 4000
-            });
         } else {
             toast.error('Failed to save assessment', {
                 id: loadingToast,
@@ -113,6 +143,7 @@ export default function RiskCalculatorPage() {
         setResourceAvailability(assessment.resource_availability ?? 20);
         setComplexity(assessment.complexity ?? 40);
         setStakeholderAlignment(assessment.stakeholder_alignment ?? 15);
+        setSelectedProjectId(assessment.project_id || undefined);
         setShowHistory(false);
 
         toast.success('Assessment loaded', {
@@ -161,6 +192,7 @@ export default function RiskCalculatorPage() {
         setComplexity(40);
         setStakeholderAlignment(15);
         setAssessmentName('');
+        setSelectedProjectId(undefined);
 
         toast.info('Reset to defaults', {
             description: 'All values have been restored',
@@ -353,6 +385,13 @@ export default function RiskCalculatorPage() {
                             <CardTitle className="text-lg">Save This Assessment</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
+                            {/* Project Selector */}
+                            <ProjectSelector
+                                selectedProjectId={selectedProjectId}
+                                onProjectSelect={setSelectedProjectId}
+                                label="Link to Project (Optional)"
+                            />
+
                             <div>
                                 <Label htmlFor="assessment-name">Assessment Name (Optional)</Label>
                                 <Input
@@ -369,8 +408,14 @@ export default function RiskCalculatorPage() {
                                 className="w-full"
                             >
                                 <Save className="mr-2 h-4 w-4" />
-                                {isSaving ? 'Saving...' : 'Save Assessment'}
+                                {isSaving ? 'Saving...' : selectedProjectId ? 'Save & Link to Project' : 'Save Assessment'}
                             </Button>
+                            {selectedProjectId && (
+                                <p className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                                    <LinkIcon className="h-3 w-3" />
+                                    Will update project health score
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -447,15 +492,15 @@ export default function RiskCalculatorPage() {
                                 {recommendations.map((rec, index) => (
                                     <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                         <div className="flex-shrink-0 mt-0.5">
-                                            {rec.includes('🚨') && <span className="text-red-500">🚨</span>}
-                                            {rec.includes('⚠️') && <span className="text-orange-500">⚠️</span>}
-                                            {rec.includes('✅') && <span className="text-green-500">✅</span>}
-                                            {!rec.includes('🚨') && !rec.includes('⚠️') && !rec.includes('✅') && (
+                                            {rec.includes('CRITICAL') && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                                            {rec.includes('WARNING') && <AlertTriangle className="h-4 w-4 text-orange-500" />}
+                                            {rec.includes('GOOD') && <span className="text-green-500">•</span>}
+                                            {!rec.includes('CRITICAL') && !rec.includes('WARNING') && !rec.includes('GOOD') && (
                                                 <span className="text-blue-500">•</span>
                                             )}
                                         </div>
                                         <p className="text-sm text-gray-700 dark:text-gray-300">
-                                            {rec.replace(/🚨|⚠️|✅/g, '').trim()}
+                                            {rec}
                                         </p>
                                     </div>
                                 ))}

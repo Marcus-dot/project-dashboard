@@ -1,28 +1,31 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Calculator, TrendingUp, TrendingDown, Save, History, Plus, Trash2 } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Calculator, TrendingUp, TrendingDown, Save, History, Plus, Trash2, Link as LinkIcon } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProjectSelector } from '@/components/ui/ProjectSelector';
 import { calculateCumulativeNPV, getDefaultDiscountRate } from '@/lib/utils/calculations';
-import { saveNPVCalculation, getUserNPVCalculations, deleteNPVCalculation } from '@/lib/services/npv-client';
+import { saveNPVCalculation, getUserNPVCalculations, deleteNPVCalculation, linkNPVToProject } from '@/lib/services/npv-client';
 import type { NPVCalculation } from '@/types/npv';
 import { createClient } from '@/lib/supabase/client';
 
 export default function NPVCalculatorPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const supabase = createClient();
 
     // Form state
-    const [initialInvestment, setInitialInvestment] = useState<number>(100);
-    const [discountRate, setDiscountRate] = useState<number>(5);
+    const [initialInvestment, setInitialInvestment] = useState<number>(100000);
+    const [discountRate, setDiscountRate] = useState<number>(10);
     const [projectDuration, setProjectDuration] = useState<number>(5);
     const [cashFlows, setCashFlows] = useState<number[]>([30000, 35000, 40000, 40000, 35000]);
+    const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
 
     // Calculation results
     const [npvResult, setNpvResult] = useState<number | null>(null);
@@ -39,6 +42,14 @@ export default function NPVCalculatorPage() {
     const [currency, setCurrency] = useState<string>('ZMW');
     const [userCountry, setUserCountry] = useState<string>('');
 
+    // Check for project ID in URL on mount
+    useEffect(() => {
+        const projectId = searchParams.get('project');
+        if (projectId) {
+            setSelectedProjectId(projectId);
+        }
+    }, [searchParams]);
+
     // Load user's company data for currency and country
     useEffect(() => {
         async function loadUserContext() {
@@ -54,7 +65,7 @@ export default function NPVCalculatorPage() {
             country
           )
         `)
-                .eq('user_id', user.id)
+                .eq('id', user.id)
                 .single();
 
             if (profile?.companies) {
@@ -127,30 +138,46 @@ export default function NPVCalculatorPage() {
     const handleSaveCalculation = async () => {
         setIsSaving(true);
 
-        // Show loading toast
-        const loadingToast = toast.loading('Saving calculation...');
+        const loadingToast = toast.loading('Saving NPV calculation...');
 
         const saved = await saveNPVCalculation({
             initial_investment: initialInvestment,
             discount_rate: discountRate,
             cash_flows: cashFlows,
-            calculation_name: calculationName || `NPV Calculation - ${new Date().toLocaleDateString()}`
+            calculation_name: calculationName || `NPV Calculation - ${new Date().toLocaleDateString()}`,
+            project_id: selectedProjectId
         });
 
         if (saved) {
+            // Link to project if selected
+            if (selectedProjectId) {
+                const linked = await linkNPVToProject(saved.id, selectedProjectId);
+                if (linked) {
+                    toast.success('NPV linked to project!', {
+                        id: loadingToast,
+                        description: 'Calculation saved and project health score updated',
+                        duration: 4000
+                    });
+                } else {
+                    toast.warning('Calculation saved but linking failed', {
+                        id: loadingToast,
+                        description: 'You can manually link it later',
+                        duration: 4000
+                    });
+                }
+            } else {
+                toast.success('Calculation saved successfully!', {
+                    id: loadingToast,
+                    description: 'You can view it in the History sidebar',
+                    duration: 4000
+                });
+            }
+
             // Reload calculations list
             const calculations = await getUserNPVCalculations();
             setSavedCalculations(calculations);
             setCalculationName('');
-
-            // Show success toast
-            toast.success('Calculation saved successfully!', {
-                id: loadingToast,
-                description: 'You can view it in the History sidebar',
-                duration: 4000
-            });
         } else {
-            // Show error toast
             toast.error('Failed to save calculation', {
                 id: loadingToast,
                 description: 'Please check your connection and try again',
@@ -167,9 +194,9 @@ export default function NPVCalculatorPage() {
         setDiscountRate(calc.discount_rate);
         setCashFlows(calc.cash_flows);
         setProjectDuration(calc.cash_flows.length);
+        setSelectedProjectId(calc.project_id || undefined);
         setShowHistory(false);
 
-        // Show success toast
         toast.success('Calculation loaded', {
             description: `Loaded "${calc.calculation_name || 'Unnamed Calculation'}"`,
             duration: 3000
@@ -178,7 +205,6 @@ export default function NPVCalculatorPage() {
 
     // Delete a saved calculation
     const handleDeleteCalculation = async (id: string, name?: string) => {
-        // Show confirmation toast with action buttons
         toast.error(`Delete "${name || 'this calculation'}"?`, {
             description: 'This action cannot be undone',
             duration: 6000,
@@ -190,13 +216,11 @@ export default function NPVCalculatorPage() {
                         const calculations = await getUserNPVCalculations();
                         setSavedCalculations(calculations);
 
-                        // Show success toast
                         toast.success('Calculation deleted', {
                             description: 'Removed from your history',
                             duration: 3000
                         });
                     } else {
-                        // Show error toast
                         toast.error('Failed to delete', {
                             description: 'Please try again',
                             duration: 4000
@@ -206,22 +230,20 @@ export default function NPVCalculatorPage() {
             },
             cancel: {
                 label: 'Cancel',
-                onClick: () => {
-                    toast.dismiss();
-                }
+                onClick: () => toast.dismiss()
             }
         });
     };
 
     // Reset to defaults
     const handleReset = () => {
-        setInitialInvestment(100);
-        setDiscountRate(getDefaultDiscountRate(userCountry) || 5);
+        setInitialInvestment(100000);
+        setDiscountRate(getDefaultDiscountRate(userCountry) || 10);
         setProjectDuration(5);
         setCashFlows([30000, 35000, 40000, 40000, 35000]);
         setCalculationName('');
+        setSelectedProjectId(undefined);
 
-        // Show info toast
         toast.info('Reset to defaults', {
             description: 'All values have been restored',
             duration: 2000
@@ -253,15 +275,15 @@ export default function NPVCalculatorPage() {
 
                 <div className="flex items-center justify-between flex-wrap gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                            <Calculator className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                        <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
+                            <Calculator className="h-6 w-6 text-green-600 dark:text-green-400" />
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                                 NPV Calculator
                             </h1>
                             <p className="text-gray-600 dark:text-gray-400 mt-1">
-                                Net Present Value Analysis Tool
+                                Net Present Value analysis for financial viability
                             </p>
                         </div>
                     </div>
@@ -351,7 +373,7 @@ export default function NPVCalculatorPage() {
                             {/* Cash Flows */}
                             <div>
                                 <Label>Expected Cash Flows by Year</Label>
-                                <div className="space-y-2 mt-2">
+                                <div className="space-y-2 mt-2 max-h-64 overflow-y-auto pr-2">
                                     {cashFlows.map((flow, index) => (
                                         <div key={index}>
                                             <Label htmlFor={`year-${index + 1}`} className="text-xs text-gray-600 dark:text-gray-400">
@@ -386,6 +408,13 @@ export default function NPVCalculatorPage() {
                             <CardTitle className="text-lg">Save This Calculation</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
+                            {/* Project Selector */}
+                            <ProjectSelector
+                                selectedProjectId={selectedProjectId}
+                                onProjectSelect={setSelectedProjectId}
+                                label="Link to Project (Optional)"
+                            />
+
                             <div>
                                 <Label htmlFor="calc-name">Calculation Name (Optional)</Label>
                                 <Input
@@ -402,8 +431,14 @@ export default function NPVCalculatorPage() {
                                 className="w-full"
                             >
                                 <Save className="mr-2 h-4 w-4" />
-                                {isSaving ? 'Saving...' : 'Save Calculation'}
+                                {isSaving ? 'Saving...' : selectedProjectId ? 'Save & Link to Project' : 'Save Calculation'}
                             </Button>
+                            {selectedProjectId && (
+                                <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                                    <LinkIcon className="h-3 w-3" />
+                                    Will update project health score
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -504,13 +539,13 @@ export default function NPVCalculatorPage() {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
                             <div className="flex items-start gap-2">
-                                <span className="font-semibold text-blue-600 dark:text-blue-400">•</span>
+                                <span className="font-semibold text-green-600 dark:text-green-400">•</span>
                                 <p>
                                     <strong className="text-gray-900 dark:text-white">NPV</strong> calculates the present value of future cash flows minus initial investment
                                 </p>
                             </div>
                             <div className="flex items-start gap-2">
-                                <span className="font-semibold text-green-600 dark:text-green-400">•</span>
+                                <span className="font-semibold text-blue-600 dark:text-blue-400">•</span>
                                 <p>
                                     <strong className="text-gray-900 dark:text-white">Positive NPV</strong> means the project is expected to generate value
                                 </p>

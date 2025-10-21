@@ -1,18 +1,28 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectForm } from '@/components/projects/ProjectForm'
-import { ProjectService } from '@/lib/services/projects'
-import { CompanyService } from '@/lib/services/company'
-import { Project, Company } from '@/types/project'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { formatCurrency } from '@/lib/utils/currency'
 import { PortfolioDonut } from '@/components/charts/PortfolioDonut'
 import { BudgetChart } from '@/components/charts/BudgetChart'
 import { CurrencySelector } from '@/components/ui/CurrencySelector'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+
+import { ProjectService } from '@/lib/services/projects'
+import { CompanyService } from '@/lib/services/company'
+import { createClient } from '@/lib/supabase/client'
 import { useCurrency } from '@/lib/context/CurrencyContext'
+import { formatCurrency } from '@/lib/utils/currency'
+
+import { Project, Company, getHealthStatus, HEALTH_THRESHOLDS } from '@/types/project'
+
 import {
     Copy,
     FileText,
@@ -28,13 +38,13 @@ import {
     BarChart3,
     LogOut,
     Building2,
-    User
+    User,
+    Heart,
+    Shield,
+    CheckCircle2,
+    XCircle
 } from 'lucide-react'
-import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+
 
 export default function DashboardPage() {
     // Currency hook
@@ -188,6 +198,54 @@ export default function DashboardPage() {
         }
     }
 
+    // Calculate portfolio health metrics
+    const portfolioHealth = () => {
+        const projectsWithHealth = projects.filter(p => p.health_score !== null && p.health_score !== undefined)
+
+        if (projectsWithHealth.length === 0) {
+            return {
+                avgScore: 0,
+                avgStatus: getHealthStatus(0),
+                excellent: 0,
+                good: 0,
+                fair: 0,
+                poor: 0,
+                critical: 0,
+                projectsWithCalculators: 0,
+                needsAttention: []
+            }
+        }
+
+        const avgScore = projectsWithHealth.reduce((sum, p) => sum + (p.health_score || 0), 0) / projectsWithHealth.length
+        const avgStatus = getHealthStatus(avgScore)
+
+        // Count by health status
+        const healthCounts = {
+            excellent: projectsWithHealth.filter(p => (p.health_score || 0) >= HEALTH_THRESHOLDS.excellent.min).length,
+            good: projectsWithHealth.filter(p => (p.health_score || 0) >= HEALTH_THRESHOLDS.good.min && (p.health_score || 0) < HEALTH_THRESHOLDS.excellent.min).length,
+            fair: projectsWithHealth.filter(p => (p.health_score || 0) >= HEALTH_THRESHOLDS.fair.min && (p.health_score || 0) < HEALTH_THRESHOLDS.good.min).length,
+            poor: projectsWithHealth.filter(p => (p.health_score || 0) >= HEALTH_THRESHOLDS.poor.min && (p.health_score || 0) < HEALTH_THRESHOLDS.fair.min).length,
+            critical: projectsWithHealth.filter(p => (p.health_score || 0) < HEALTH_THRESHOLDS.poor.min).length
+        }
+
+        // Projects needing attention (poor or critical)
+        const needsAttention = projects.filter(p =>
+            p.health_score !== null &&
+            p.health_score !== undefined &&
+            p.health_score < HEALTH_THRESHOLDS.fair.min
+        )
+
+        return {
+            avgScore,
+            avgStatus,
+            ...healthCounts,
+            projectsWithCalculators: projectsWithHealth.length,
+            needsAttention
+        }
+    }
+
+    const health = portfolioHealth()
+
     const stats = {
         total: projects.length,
         inProgress: projects.filter(p => p.status === 'In progress').length,
@@ -230,6 +288,9 @@ export default function DashboardPage() {
 
                         {/* Right Actions */}
                         <div className="flex items-center gap-3">
+                            {/* Theme Toggle */}
+                            <ThemeToggle />
+
                             {/* Currency Selector */}
                             <CurrencySelector />
 
@@ -272,6 +333,105 @@ export default function DashboardPage() {
                         Monitor, analyze, and manage your project portfolio
                     </p>
                 </div>
+
+                {/* Portfolio Health Widget - NEW */}
+                {health.projectsWithCalculators > 0 && (
+                    <Card className="mb-8 border-2" style={{ borderColor: health.avgStatus.color }}>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-3 rounded-lg" style={{ backgroundColor: health.avgStatus.bgColor }}>
+                                        <Heart className="h-6 w-6" style={{ color: health.avgStatus.color }} />
+                                    </div>
+                                    <div>
+                                        <CardTitle>Portfolio Health Score</CardTitle>
+                                        <CardDescription>
+                                            Based on {health.projectsWithCalculators} of {projects.length} projects with analytics
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-4xl font-bold" style={{ color: health.avgStatus.color }}>
+                                        {Math.round(health.avgScore)}
+                                    </div>
+                                    <div className="text-sm font-semibold" style={{ color: health.avgStatus.color }}>
+                                        {health.avgStatus.label}
+                                    </div>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-5 gap-4 mb-4">
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold" style={{ color: HEALTH_THRESHOLDS.excellent.color }}>
+                                        {health.excellent}
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">Excellent</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold" style={{ color: HEALTH_THRESHOLDS.good.color }}>
+                                        {health.good}
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">Good</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold" style={{ color: HEALTH_THRESHOLDS.fair.color }}>
+                                        {health.fair}
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">Fair</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold" style={{ color: HEALTH_THRESHOLDS.poor.color }}>
+                                        {health.poor}
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">Poor</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold" style={{ color: HEALTH_THRESHOLDS.critical.color }}>
+                                        {health.critical}
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400">Critical</div>
+                                </div>
+                            </div>
+
+                            {/* Projects Needing Attention */}
+                            {health.needsAttention.length > 0 && (
+                                <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                                        <span className="font-semibold text-orange-900 dark:text-orange-100">
+                                            {health.needsAttention.length} Project{health.needsAttention.length > 1 ? 's' : ''} Need Attention
+                                        </span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {health.needsAttention.map(project => {
+                                            const projectHealth = getHealthStatus(project.health_score)
+                                            return (
+                                                <div key={project.id} className="text-sm text-orange-800 dark:text-orange-200 flex items-center gap-2">
+                                                    <XCircle className="h-3 w-3" style={{ color: projectHealth.color }} />
+                                                    <span className="font-medium">{project.name}</span>
+                                                    <span className="text-xs">
+                                                        (Score: {Math.round(project.health_score || 0)} - {projectHealth.label})
+                                                    </span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* All Good Message */}
+                            {health.needsAttention.length === 0 && health.projectsWithCalculators > 0 && (
+                                <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                    <div className="flex items-center gap-2 text-green-900 dark:text-green-100">
+                                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                        <span className="font-semibold">All projects are performing well!</span>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -421,6 +581,24 @@ export default function DashboardPage() {
                                                     </div>
                                                     <div className="text-xs text-gray-500 dark:text-gray-400">
                                                         Risk assessment tool
+                                                    </div>
+                                                </div>
+                                            </Link>
+
+                                            <Link
+                                                href="/tools/wastage-calculator"
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                                onClick={() => setShowToolsDropdown(false)}
+                                            >
+                                                <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                                                    <TrendingDown className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium text-gray-900 dark:text-white text-sm">
+                                                        Wastage Calculator
+                                                    </div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                        Resource efficiency analysis
                                                     </div>
                                                 </div>
                                             </Link>

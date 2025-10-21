@@ -64,3 +64,24 @@ export async function deleteRiskAssessment(id: string): Promise<boolean> {
         return false;
     }
 }
+
+// NEW: Link Risk assessment to project
+export async function linkRiskToProject(assessmentId: string, projectId: string): Promise<boolean> {
+    try {
+        const response = await fetch('/api/risk/link-to-project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assessment_id: assessmentId, project_id: projectId })
+        });
+
+        if (!response.ok) {
+            console.error('Error linking risk assessment to project');
+            return false;
+        }
+
+        return true;
+    } catch (error) {
+        console.error('linkRiskToProject error:', error);
+        return false;
+    }
+}

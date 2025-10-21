@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Project, Priority, Status } from '@/types/project'
+import { Project, Priority, Status, Scale } from '@/types/project'
 import { useCurrency } from '@/lib/context/CurrencyContext'
 
 interface ProjectFormProps {
@@ -23,6 +23,7 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
         start_date: project?.start_date || '',
         priority: project?.priority || 'Medium',
         status: project?.status || 'Planning',
+        scale: project?.scale || 'Medium-term',
         notes: project?.notes || '',
         budget: project?.budget || '',
         expected_revenue: project?.expected_revenue || '',
@@ -43,6 +44,7 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
                 start_date: formData.start_date || undefined,
                 priority: formData.priority as Priority,
                 status: formData.status as Status,
+                scale: formData.scale as Scale,
                 duration: formData.duration ? parseInt(formData.duration.toString()) : undefined,
                 budget: formData.budget ? parseFloat(formData.budget.toString()) : undefined,
                 expected_revenue: formData.expected_revenue ? parseFloat(formData.expected_revenue.toString()) : undefined,
@@ -142,6 +144,22 @@ export function ProjectForm({ project, onSubmit, onCancel }: ProjectFormProps) {
                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
                         </div>
+                    </div>
+
+                    {/* Scale */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Project Scale
+                        </label>
+                        <select
+                            value={formData.scale}
+                            onChange={(e) => setFormData({ ...formData, scale: e.target.value as Scale })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                            <option value="Short-term">Short-term</option>
+                            <option value="Medium-term">Medium-term</option>
+                            <option value="Long-term">Long-term</option>
+                        </select>
                     </div>
 
                     {/* Priority and Status */}
