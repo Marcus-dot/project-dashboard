@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ProjectSelector } from '@/components/ui/ProjectSelector';
 import { calculateCumulativeNPV, getDefaultDiscountRate } from '@/lib/utils/calculations';
 import { saveNPVCalculation, getUserNPVCalculations, deleteNPVCalculation, linkNPVToProject } from '@/lib/services/npv-client';
-import type { NPVCalculation } from '@/types/npv';
+import { PERIOD_CONFIGS, getPeriodLabel, type NPVCalculation, type PeriodType } from '@/types/npv';
 import { createClient } from '@/lib/supabase/client';
 
 export default function NPVCalculatorPage() {
@@ -23,6 +23,7 @@ export default function NPVCalculatorPage() {
     // Form state
     const [initialInvestment, setInitialInvestment] = useState<number>(100000);
     const [discountRate, setDiscountRate] = useState<number>(10);
+    const [periodType, setPeriodType] = useState<PeriodType>('years'); // NEW: Period type selector
     const [projectDuration, setProjectDuration] = useState<number>(5);
     const [cashFlows, setCashFlows] = useState<number[]>([30000, 35000, 40000, 40000, 35000]);
     const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
@@ -30,7 +31,7 @@ export default function NPVCalculatorPage() {
     // Calculation results
     const [npvResult, setNpvResult] = useState<number | null>(null);
     const [isViable, setIsViable] = useState<boolean>(false);
-    const [chartData, setChartData] = useState<Array<{ year: number; value: number }>>([]);
+    const [chartData, setChartData] = useState<Array<{ period: number; value: number }>>([]);
 
     // UI state
     const [isSaving, setIsSaving] = useState(false);
@@ -99,14 +100,26 @@ export default function NPVCalculatorPage() {
     // Calculate NPV whenever inputs change
     useEffect(() => {
         if (cashFlows.length > 0) {
-            const cumulativeData = calculateCumulativeNPV(initialInvestment, discountRate, cashFlows);
+            const cumulativeData = calculateCumulativeNPV(initialInvestment, discountRate, cashFlows, periodType);
             const finalNPV = cumulativeData[cumulativeData.length - 1].value;
 
             setNpvResult(finalNPV);
             setIsViable(finalNPV > 0);
             setChartData(cumulativeData);
         }
-    }, [initialInvestment, discountRate, cashFlows]);
+    }, [initialInvestment, discountRate, cashFlows, periodType]);
+
+    // Handle period type change
+    const handlePeriodTypeChange = (newPeriodType: PeriodType) => {
+        setPeriodType(newPeriodType);
+
+        // Optionally adjust duration and cash flows when switching period types
+        // For now, we keep the same number of periods
+        toast.info(`Switched to ${PERIOD_CONFIGS[newPeriodType].label}`, {
+            description: 'Cash flow labels updated',
+            duration: 2000
+        });
+    };
 
     // Handle duration change
     const handleDurationChange = (newDuration: number) => {
@@ -115,13 +128,13 @@ export default function NPVCalculatorPage() {
         // Adjust cash flows array
         const newCashFlows = [...cashFlows];
         if (newDuration > cashFlows.length) {
-            // Add new years with default value (average of existing)
+            // Add new periods with default value (average of existing)
             const avgFlow = cashFlows.reduce((sum, val) => sum + val, 0) / cashFlows.length;
             while (newCashFlows.length < newDuration) {
                 newCashFlows.push(Math.round(avgFlow));
             }
         } else {
-            // Remove years
+            // Remove periods
             newCashFlows.splice(newDuration);
         }
         setCashFlows(newCashFlows);
@@ -144,6 +157,7 @@ export default function NPVCalculatorPage() {
             initial_investment: initialInvestment,
             discount_rate: discountRate,
             cash_flows: cashFlows,
+            period_type: periodType, // NEW: Save period type
             calculation_name: calculationName || `NPV Calculation - ${new Date().toLocaleDateString()}`,
             project_id: selectedProjectId
         });
@@ -194,6 +208,7 @@ export default function NPVCalculatorPage() {
         setDiscountRate(calc.discount_rate);
         setCashFlows(calc.cash_flows);
         setProjectDuration(calc.cash_flows.length);
+        setPeriodType(calc.period_type || 'years'); // NEW: Load period type
         setSelectedProjectId(calc.project_id || undefined);
         setShowHistory(false);
 
@@ -239,6 +254,7 @@ export default function NPVCalculatorPage() {
     const handleReset = () => {
         setInitialInvestment(100000);
         setDiscountRate(getDefaultDiscountRate(userCountry) || 10);
+        setPeriodType('years');
         setProjectDuration(5);
         setCashFlows([30000, 35000, 40000, 40000, 35000]);
         setCalculationName('');
@@ -322,7 +338,7 @@ export default function NPVCalculatorPage() {
 
                             {/* Discount Rate */}
                             <div>
-                                <Label htmlFor="discount-rate">Discount Rate (%)</Label>
+                                <Label htmlFor="discount-rate">Discount Rate (% per year)</Label>
                                 <Input
                                     id="discount-rate"
                                     type="number"
@@ -338,9 +354,31 @@ export default function NPVCalculatorPage() {
                                 )}
                             </div>
 
+                            {/* NEW: Period Type Selector */}
+                            <div>
+                                <Label htmlFor="period-type">Cash Flow Period Type</Label>
+                                <select
+                                    id="period-type"
+                                    value={periodType}
+                                    onChange={(e) => handlePeriodTypeChange(e.target.value as PeriodType)}
+                                    className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                                >
+                                    {Object.entries(PERIOD_CONFIGS).map(([key, config]) => (
+                                        <option key={key} value={key}>
+                                            {config.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Choose the time period for your cash flows
+                                </p>
+                            </div>
+
                             {/* Project Duration */}
                             <div>
-                                <Label htmlFor="project-duration">Project Duration (Years)</Label>
+                                <Label htmlFor="project-duration">
+                                    Number of {PERIOD_CONFIGS[periodType].label}
+                                </Label>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Button
                                         variant="outline"
@@ -357,30 +395,30 @@ export default function NPVCalculatorPage() {
                                         onChange={(e) => handleDurationChange(Math.max(1, Number(e.target.value)))}
                                         className="text-center"
                                         min="1"
-                                        max="30"
+                                        max="52"
                                     />
                                     <Button
                                         variant="outline"
                                         size="icon"
-                                        onClick={() => handleDurationChange(Math.min(30, projectDuration + 1))}
-                                        disabled={projectDuration >= 30}
+                                        onClick={() => handleDurationChange(Math.min(52, projectDuration + 1))}
+                                        disabled={projectDuration >= 52}
                                     >
                                         <Plus className="h-4 w-4" />
                                     </Button>
                                 </div>
                             </div>
 
-                            {/* Cash Flows */}
+                            {/* Cash Flows - Dynamic Labels */}
                             <div>
-                                <Label>Expected Cash Flows by Year</Label>
+                                <Label>Expected Cash Flows by {PERIOD_CONFIGS[periodType].singular}</Label>
                                 <div className="space-y-2 mt-2 max-h-64 overflow-y-auto pr-2">
                                     {cashFlows.map((flow, index) => (
                                         <div key={index}>
-                                            <Label htmlFor={`year-${index + 1}`} className="text-xs text-gray-600 dark:text-gray-400">
-                                                Year {index + 1}:
+                                            <Label htmlFor={`period-${index + 1}`} className="text-xs text-gray-600 dark:text-gray-400">
+                                                {getPeriodLabel(periodType, index + 1)}:
                                             </Label>
                                             <Input
-                                                id={`year-${index + 1}`}
+                                                id={`period-${index + 1}`}
                                                 type="number"
                                                 value={flow}
                                                 onChange={(e) => handleCashFlowChange(index, Number(e.target.value))}
@@ -494,15 +532,21 @@ export default function NPVCalculatorPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Cumulative Present Value Over Time</CardTitle>
-                            <CardDescription>Track how NPV accumulates across project years</CardDescription>
+                            <CardDescription>
+                                Track how NPV accumulates across {PERIOD_CONFIGS[periodType].label.toLowerCase()}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={350}>
                                 <LineChart data={chartData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                                     <XAxis
-                                        dataKey="year"
-                                        label={{ value: 'Year', position: 'insideBottom', offset: -5 }}
+                                        dataKey="period"
+                                        label={{
+                                            value: PERIOD_CONFIGS[periodType].singular,
+                                            position: 'insideBottom',
+                                            offset: -5
+                                        }}
                                         stroke="#6b7280"
                                     />
                                     <YAxis
@@ -512,6 +556,7 @@ export default function NPVCalculatorPage() {
                                     />
                                     <Tooltip
                                         formatter={(value: number) => [formatCurrency(value), 'Cumulative NPV']}
+                                        labelFormatter={(label) => `${getPeriodLabel(periodType, label)}`}
                                         contentStyle={{
                                             backgroundColor: '#ffffff',
                                             border: '1px solid #e5e7eb',
@@ -559,7 +604,13 @@ export default function NPVCalculatorPage() {
                             <div className="flex items-start gap-2">
                                 <span className="font-semibold text-purple-600 dark:text-purple-400">•</span>
                                 <p>
-                                    The <strong className="text-gray-900 dark:text-white">discount rate</strong> reflects the cost of capital or required return
+                                    The <strong className="text-gray-900 dark:text-white">discount rate</strong> reflects the annual cost of capital or required return
+                                </p>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">•</span>
+                                <p>
+                                    <strong className="text-gray-900 dark:text-white">Period Type:</strong> Choose years for long-term projects, quarters for medium-term, or months/weeks for short-term projects
                                 </p>
                             </div>
                         </CardContent>
@@ -593,60 +644,64 @@ export default function NPVCalculatorPage() {
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {savedCalculations.map((calc) => (
-                                        <Card key={calc.id} className="cursor-pointer hover:shadow-lg transition-shadow">
-                                            <CardContent className="p-4">
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <div className="flex-1" onClick={() => handleLoadCalculation(calc)}>
-                                                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                                                            {calc.calculation_name || 'Unnamed Calculation'}
-                                                        </h3>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                            {new Date(calc.created_at).toLocaleDateString()} at{' '}
-                                                            {new Date(calc.created_at).toLocaleTimeString()}
-                                                        </p>
+                                    {savedCalculations.map((calc) => {
+                                        const calcPeriodType = calc.period_type || 'years';
+                                        return (
+                                            <Card key={calc.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+                                                <CardContent className="p-4">
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <div className="flex-1" onClick={() => handleLoadCalculation(calc)}>
+                                                            <h3 className="font-semibold text-gray-900 dark:text-white">
+                                                                {calc.calculation_name || 'Unnamed Calculation'}
+                                                            </h3>
+                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                                {new Date(calc.created_at).toLocaleDateString()} at{' '}
+                                                                {new Date(calc.created_at).toLocaleTimeString()}
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteCalculation(calc.id, calc.calculation_name || undefined);
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
                                                     </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDeleteCalculation(calc.id, calc.calculation_name || undefined);
-                                                        }}
-                                                        className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-2 text-sm" onClick={() => handleLoadCalculation(calc)}>
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">NPV Result:</p>
-                                                        <p className={`font-semibold ${calc.is_viable ? 'text-green-600' : 'text-red-600'}`}>
-                                                            {formatCurrency(calc.npv_result)}
-                                                        </p>
+                                                    <div className="grid grid-cols-2 gap-2 text-sm" onClick={() => handleLoadCalculation(calc)}>
+                                                        <div>
+                                                            <p className="text-gray-500 dark:text-gray-400">NPV Result:</p>
+                                                            <p className={`font-semibold ${calc.is_viable ? 'text-green-600' : 'text-red-600'}`}>
+                                                                {formatCurrency(calc.npv_result)}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-gray-500 dark:text-gray-400">Status:</p>
+                                                            <p className={`font-semibold ${calc.is_viable ?
+                                                                'text-green-600' : 'text-red-600'}`}>
+                                                                {calc.is_viable ? 'Viable' : 'Not Viable'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-gray-500 dark:text-gray-400">Duration:</p>
+                                                            <p className="font-semibold text-gray-900 dark:text-white">
+                                                                {calc.project_duration} {PERIOD_CONFIGS[calcPeriodType].label.toLowerCase()}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-gray-500 dark:text-gray-400">Rate:</p>
+                                                            <p className="font-semibold text-gray-900 dark:text-white">
+                                                                {calc.discount_rate}%
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">Status:</p>
-                                                        <p className={`font-semibold ${calc.is_viable ? 'text-green-600' : 'text-red-600'}`}>
-                                                            {calc.is_viable ? 'Viable' : 'Not Viable'}
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">Duration:</p>
-                                                        <p className="font-semibold text-gray-900 dark:text-white">
-                                                            {calc.project_duration} years
-                                                        </p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-gray-500 dark:text-gray-400">Rate:</p>
-                                                        <p className="font-semibold text-gray-900 dark:text-white">
-                                                            {calc.discount_rate}%
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

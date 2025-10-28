@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 import type { Project } from '@/types/project'
-import { calculateNPV } from '@/lib/utils/calculations'
+import { calculateProjectNPV } from '@/lib/utils/calculations'  // ✅ FIXED: Import legacy function
 
 export class ProjectService {
     // Create a Supabase client instance
@@ -47,6 +47,7 @@ export class ProjectService {
         return data as Project
     }
 
+    // FUNCTION 3: Create a new project
     async createProject(project: Partial<Project>) {
         const { data: { user } } = await this.supabase.auth.getUser()
         if (!user) throw new Error('Not authenticated')
@@ -56,7 +57,7 @@ export class ProjectService {
 
         const scale = this.calculateScale(project.duration)
 
-        const npv = this.calculateProjectNPV(
+        const npv = this.calculateNPV(
             project.expected_revenue || 0,
             project.actual_costs || 0,
             project.discount_rate || 10,
@@ -80,12 +81,13 @@ export class ProjectService {
         return data as Project
     }
 
+    // FUNCTION 4: Update a project
     async updateProject(id: string, updates: Partial<Project>) {
         const existing = await this.getProject(id)
 
         const scale = updates.duration ? this.calculateScale(updates.duration) : undefined
 
-        const npv = this.calculateProjectNPV(
+        const npv = this.calculateNPV(
             updates.expected_revenue ?? existing.expected_revenue ?? 0,
             updates.actual_costs ?? existing.actual_costs ?? 0,
             updates.discount_rate ?? existing.discount_rate ?? 10,
@@ -117,6 +119,7 @@ export class ProjectService {
         if (error) throw error
     }
 
+    // HELPER: Calculate project scale based on duration
     private calculateScale(duration?: number): 'Short-term' | 'Medium-term' | 'Long-term' {
         if (!duration) return 'Short-term'
         if (duration <= 3) return 'Short-term'
@@ -124,12 +127,16 @@ export class ProjectService {
         return 'Long-term'
     }
 
-    private calculateProjectNPV(
+    // HELPER: Calculate NPV using legacy simplified method
+    // NOTE: This uses the simplified NPV calculation for basic projects
+    // For advanced NPV with cash flow arrays, use the main calculateNPV function
+    private calculateNPV(
         expectedRevenue: number,
         actualCosts: number,
         discountRate: number,
         durationMonths: number
     ): number {
-        return calculateNPV(expectedRevenue, actualCosts, discountRate, durationMonths)
+        // ✅ FIXED: Call the legacy function that matches this signature
+        return calculateProjectNPV(expectedRevenue, actualCosts, discountRate, durationMonths)
     }
 }

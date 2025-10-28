@@ -2,24 +2,30 @@
 export { formatCurrency, formatPercentage, formatCompactNumber } from './currency'
 export type { Currency } from './currency'
 
+import { PeriodType, PERIOD_CONFIGS, periodsToYears } from '@/types/npv'
+
 /**
- * Calculate Net Present Value (NPV) - NEW ENHANCED VERSION
+ * Calculate Net Present Value (NPV) - ENHANCED WITH PERIOD SUPPORT
  * Formula: NPV = -I₀ + Σ(CFₜ / (1 + r)ᵗ)
  * 
- * @param initialInvestment - Upfront cost (e.g., 100 ZMW)
- * @param discountRate - Annual discount rate as percentage (e.g., 5 for 5%)
- * @param cashFlows - Array of yearly cash flows (e.g., [30000, 35000, 40000])
+ * @param initialInvestment - Upfront cost (e.g., 100000 ZMW)
+ * @param discountRate - Annual discount rate as percentage (e.g., 10 for 10%)
+ * @param cashFlows - Array of cash flows per period (e.g., [30000, 35000, 40000])
+ * @param periodType - Type of period: 'years', 'quarters', 'months', or 'weeks' (default: 'years')
  * @returns NPV value (positive = viable, negative = not viable)
  */
 export function calculateNPV(
   initialInvestment: number,
   discountRate: number,
-  cashFlows: number[]
+  cashFlows: number[],
+  periodType: PeriodType = 'years'
 ): number {
   let npv = -initialInvestment;
 
-  for (let year = 0; year < cashFlows.length; year++) {
-    npv += cashFlows[year] / Math.pow(1 + discountRate / 100, year + 1);
+  for (let period = 0; period < cashFlows.length; period++) {
+    // Convert period to years for discounting
+    const yearsFromStart = periodsToYears(period + 1, periodType);
+    npv += cashFlows[period] / Math.pow(1 + discountRate / 100, yearsFromStart);
   }
 
   return npv;
@@ -27,28 +33,32 @@ export function calculateNPV(
 
 /**
  * Calculate cumulative NPV over time (for chart visualization)
- * Returns array of {year, value} points showing NPV accumulation
+ * Returns array of {period, value} points showing NPV accumulation
  * 
  * @param initialInvestment - Upfront cost
  * @param discountRate - Annual discount rate as percentage
- * @param cashFlows - Array of yearly cash flows
- * @returns Array of cumulative NPV points for each year
+ * @param cashFlows - Array of cash flows per period
+ * @param periodType - Type of period: 'years', 'quarters', 'months', or 'weeks' (default: 'years')
+ * @returns Array of cumulative NPV points for each period
  */
 export function calculateCumulativeNPV(
   initialInvestment: number,
   discountRate: number,
-  cashFlows: number[]
-): Array<{ year: number; value: number }> {
-  const points: Array<{ year: number; value: number }> = [
-    { year: 0, value: -initialInvestment }
+  cashFlows: number[],
+  periodType: PeriodType = 'years'
+): Array<{ period: number; value: number }> {
+  const points: Array<{ period: number; value: number }> = [
+    { period: 0, value: -initialInvestment }
   ];
 
   let cumulative = -initialInvestment;
 
-  for (let year = 0; year < cashFlows.length; year++) {
-    const presentValue = cashFlows[year] / Math.pow(1 + discountRate / 100, year + 1);
+  for (let period = 0; period < cashFlows.length; period++) {
+    // Convert period to years for discounting
+    const yearsFromStart = periodsToYears(period + 1, periodType);
+    const presentValue = cashFlows[period] / Math.pow(1 + discountRate / 100, yearsFromStart);
     cumulative += presentValue;
-    points.push({ year: year + 1, value: cumulative });
+    points.push({ period: period + 1, value: cumulative });
   }
 
   return points;
@@ -58,7 +68,7 @@ export function calculateCumulativeNPV(
  * Legacy NPV calculation (kept for backward compatibility)
  * Use the new calculateNPV() for standard NPV calculations
  * 
- * @deprecated Use calculateNPV(initialInvestment, discountRate, cashFlows) instead
+ * @deprecated Use calculateNPV(initialInvestment, discountRate, cashFlows, periodType) instead
  */
 export function calculateProjectNPV(
   expectedRevenue: number,

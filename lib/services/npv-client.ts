@@ -1,4 +1,4 @@
-import type { NPVCalculation } from '@/types/npv';
+import type { NPVCalculation, PeriodType } from '@/types/npv';
 
 /**
  * CLIENT-SIDE NPV service that calls API routes
@@ -9,6 +9,7 @@ export async function saveNPVCalculation(input: {
     initial_investment: number;
     discount_rate: number;
     cash_flows: number[];
+    period_type?: PeriodType; // NEW: Period type support
     calculation_name?: string;
     project_id?: string;
 }): Promise<NPVCalculation | null> {
@@ -71,7 +72,7 @@ export async function deleteNPVCalculation(id: string): Promise<boolean> {
     }
 }
 
-// NEW: Link NPV calculation to project
+// Link NPV calculation to project
 export async function linkNPVToProject(calculationId: string, projectId: string): Promise<boolean> {
     try {
         const response = await fetch('/api/npv/link-to-project', {

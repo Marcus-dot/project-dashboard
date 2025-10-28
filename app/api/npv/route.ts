@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { calculateNPV } from '@/lib/utils/calculations';
+import type { PeriodType } from '@/types/npv';
 
 // GET: Fetch all user's NPV calculations
 export async function GET(request: NextRequest) {
@@ -40,11 +41,24 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json();
-        const { initial_investment, discount_rate, cash_flows, calculation_name, project_id } = body;
+        const {
+            initial_investment,
+            discount_rate,
+            cash_flows,
+            period_type = 'years', // NEW: Default to 'years' for backward compatibility
+            calculation_name,
+            project_id
+        } = body;
 
         // Validate inputs
         if (!initial_investment || !discount_rate || !cash_flows || !Array.isArray(cash_flows)) {
             return NextResponse.json({ error: 'Invalid input parameters' }, { status: 400 });
+        }
+
+        // Validate period_type
+        const validPeriodTypes: PeriodType[] = ['years', 'quarters', 'months', 'weeks'];
+        if (!validPeriodTypes.includes(period_type)) {
+            return NextResponse.json({ error: 'Invalid period_type' }, { status: 400 });
         }
 
         // Get user's profile (simplified - just company_id)
@@ -79,8 +93,8 @@ export async function POST(request: NextRequest) {
             currency = company.currency;
         }
 
-        // Calculate NPV
-        const npv = calculateNPV(initial_investment, discount_rate, cash_flows);
+        // Calculate NPV with period type support
+        const npv = calculateNPV(initial_investment, discount_rate, cash_flows, period_type);
         const isViable = npv > 0;
 
         // Insert into database
@@ -94,6 +108,7 @@ export async function POST(request: NextRequest) {
                 discount_rate,
                 project_duration: cash_flows.length,
                 cash_flows,
+                period_type, // NEW: Save period type
                 npv_result: npv,
                 is_viable: isViable,
                 currency,
