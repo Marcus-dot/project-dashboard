@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, AlertTriangle, Save, History, Trash2, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,7 +14,8 @@ import { saveRiskAssessment, getUserRiskAssessments, deleteRiskAssessment, linkR
 import { getRiskLevelFromScore, getRiskRecommendations, RISK_FACTORS, RISK_WEIGHTS } from '@/types/risk';
 import type { RiskAssessment } from '@/types/risk';
 
-export default function RiskCalculatorPage() {
+// ✅ EXTRACTED: Component that uses useSearchParams
+function RiskCalculatorContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -98,7 +99,6 @@ export default function RiskCalculatorPage() {
         });
 
         if (saved) {
-            // Link to project if selected
             if (selectedProjectId) {
                 const linked = await linkRiskToProject(saved.id, selectedProjectId);
                 if (linked) {
@@ -385,7 +385,6 @@ export default function RiskCalculatorPage() {
                             <CardTitle className="text-lg">Save This Assessment</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {/* Project Selector */}
                             <ProjectSelector
                                 selectedProjectId={selectedProjectId}
                                 onProjectSelect={setSelectedProjectId}
@@ -624,5 +623,21 @@ export default function RiskCalculatorPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+// ✅ MAIN EXPORT: Wrapped in Suspense
+export default function RiskCalculatorPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="text-center">
+                    <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4 animate-pulse" />
+                    <p className="text-gray-600 dark:text-gray-400">Loading Risk Calculator...</p>
+                </div>
+            </div>
+        }>
+            <RiskCalculatorContent />
+        </Suspense>
     );
 }
