@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, TrendingDown, Save, History, Trash2, AlertTriangle, CheckCircle, Package, Link as LinkIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,7 +20,8 @@ import {
 import { useCurrency } from '@/lib/context/CurrencyContext'
 import { formatCurrency } from '@/lib/utils/currency'
 
-export default function WastageCalculatorPage() {
+// ✅ EXTRACTED: Component that uses useSearchParams
+function WastageCalculatorContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const { currency } = useCurrency()
@@ -106,7 +107,6 @@ export default function WastageCalculatorPage() {
         })
 
         if (saved) {
-            // Link to project if selected
             if (selectedProjectId) {
                 const linked = await linkWastageToProject(saved.id, selectedProjectId)
                 if (linked) {
@@ -348,7 +348,6 @@ export default function WastageCalculatorPage() {
                             <CardTitle className="text-lg">Save This Assessment</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {/* Project Selector */}
                             <ProjectSelector
                                 selectedProjectId={selectedProjectId}
                                 onProjectSelect={setSelectedProjectId}
@@ -514,7 +513,6 @@ export default function WastageCalculatorPage() {
                         <CardContent>
                             <div className="space-y-3">
                                 {recommendations.map((rec, index) => {
-                                    // Determine icon based on recommendation type
                                     let icon = null
                                     let iconColor = 'text-gray-500'
 
@@ -677,5 +675,21 @@ export default function WastageCalculatorPage() {
                 </div>
             )}
         </div>
+    )
+}
+
+// ✅ MAIN EXPORT: Wrapped in Suspense
+export default function WastageCalculatorPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="text-center">
+                    <TrendingDown className="h-12 w-12 text-gray-400 mx-auto mb-4 animate-pulse" />
+                    <p className="text-gray-600 dark:text-gray-400">Loading Wastage Calculator...</p>
+                </div>
+            </div>
+        }>
+            <WastageCalculatorContent />
+        </Suspense>
     )
 }
