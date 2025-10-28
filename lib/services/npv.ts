@@ -13,14 +13,14 @@ export async function performNPVCalculation(
     const npv = calculateNPV(initialInvestment, discountRate, cashFlows);
     const cumulativeValues = calculateCumulativeNPV(initialInvestment, discountRate, cashFlows);
 
-    // Find break-even year (when cumulative NPV becomes positive)
-    const breakEvenYear = cumulativeValues.findIndex(point => point.value > 0);
+    // Find break-even period (when cumulative NPV becomes positive)
+    const breakEvenPeriod = cumulativeValues.findIndex(point => point.value > 0);
 
     return {
         npv,
         isViable: npv > 0,
         cumulativeValues,
-        breakEvenYear: breakEvenYear !== -1 ? breakEvenYear : undefined
+        breakEvenPeriod: breakEvenPeriod !== -1 ? breakEvenPeriod : undefined  // ✅ FIXED: Changed from breakEvenYear to breakEvenPeriod
     };
 }
 
