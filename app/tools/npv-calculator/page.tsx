@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Calculator, TrendingUp, TrendingDown, Save, History, Plus, Trash2, Link as LinkIcon } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -15,7 +15,8 @@ import { saveNPVCalculation, getUserNPVCalculations, deleteNPVCalculation, linkN
 import { PERIOD_CONFIGS, getPeriodLabel, type NPVCalculation, type PeriodType } from '@/types/npv';
 import { createClient } from '@/lib/supabase/client';
 
-export default function NPVCalculatorPage() {
+// ✅ EXTRACTED: Component that uses useSearchParams
+function NPVCalculatorContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const supabase = createClient();
@@ -23,7 +24,7 @@ export default function NPVCalculatorPage() {
     // Form state
     const [initialInvestment, setInitialInvestment] = useState<number>(100000);
     const [discountRate, setDiscountRate] = useState<number>(10);
-    const [periodType, setPeriodType] = useState<PeriodType>('years'); // NEW: Period type selector
+    const [periodType, setPeriodType] = useState<PeriodType>('years');
     const [projectDuration, setProjectDuration] = useState<number>(5);
     const [cashFlows, setCashFlows] = useState<number[]>([30000, 35000, 40000, 40000, 35000]);
     const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
@@ -78,7 +79,6 @@ export default function NPVCalculatorPage() {
                 }
                 if (companyData?.country) {
                     setUserCountry(companyData.country);
-                    // Set country-specific default discount rate
                     const defaultRate = getDefaultDiscountRate(companyData.country);
                     setDiscountRate(defaultRate);
                 }
@@ -113,8 +113,6 @@ export default function NPVCalculatorPage() {
     const handlePeriodTypeChange = (newPeriodType: PeriodType) => {
         setPeriodType(newPeriodType);
 
-        // Optionally adjust duration and cash flows when switching period types
-        // For now, we keep the same number of periods
         toast.info(`Switched to ${PERIOD_CONFIGS[newPeriodType].label}`, {
             description: 'Cash flow labels updated',
             duration: 2000
@@ -125,16 +123,13 @@ export default function NPVCalculatorPage() {
     const handleDurationChange = (newDuration: number) => {
         setProjectDuration(newDuration);
 
-        // Adjust cash flows array
         const newCashFlows = [...cashFlows];
         if (newDuration > cashFlows.length) {
-            // Add new periods with default value (average of existing)
             const avgFlow = cashFlows.reduce((sum, val) => sum + val, 0) / cashFlows.length;
             while (newCashFlows.length < newDuration) {
                 newCashFlows.push(Math.round(avgFlow));
             }
         } else {
-            // Remove periods
             newCashFlows.splice(newDuration);
         }
         setCashFlows(newCashFlows);
@@ -157,13 +152,12 @@ export default function NPVCalculatorPage() {
             initial_investment: initialInvestment,
             discount_rate: discountRate,
             cash_flows: cashFlows,
-            period_type: periodType, // NEW: Save period type
+            period_type: periodType,
             calculation_name: calculationName || `NPV Calculation - ${new Date().toLocaleDateString()}`,
             project_id: selectedProjectId
         });
 
         if (saved) {
-            // Link to project if selected
             if (selectedProjectId) {
                 const linked = await linkNPVToProject(saved.id, selectedProjectId);
                 if (linked) {
@@ -187,7 +181,6 @@ export default function NPVCalculatorPage() {
                 });
             }
 
-            // Reload calculations list
             const calculations = await getUserNPVCalculations();
             setSavedCalculations(calculations);
             setCalculationName('');
@@ -208,7 +201,7 @@ export default function NPVCalculatorPage() {
         setDiscountRate(calc.discount_rate);
         setCashFlows(calc.cash_flows);
         setProjectDuration(calc.cash_flows.length);
-        setPeriodType(calc.period_type || 'years'); // NEW: Load period type
+        setPeriodType(calc.period_type || 'years');
         setSelectedProjectId(calc.project_id || undefined);
         setShowHistory(false);
 
@@ -354,7 +347,7 @@ export default function NPVCalculatorPage() {
                                 )}
                             </div>
 
-                            {/* NEW: Period Type Selector */}
+                            {/* Period Type Selector */}
                             <div>
                                 <Label htmlFor="period-type">Cash Flow Period Type</Label>
                                 <select
@@ -408,7 +401,7 @@ export default function NPVCalculatorPage() {
                                 </div>
                             </div>
 
-                            {/* Cash Flows - Dynamic Labels */}
+                            {/* Cash Flows */}
                             <div>
                                 <Label>Expected Cash Flows by {PERIOD_CONFIGS[periodType].singular}</Label>
                                 <div className="space-y-2 mt-2 max-h-64 overflow-y-auto pr-2">
@@ -446,7 +439,6 @@ export default function NPVCalculatorPage() {
                             <CardTitle className="text-lg">Save This Calculation</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {/* Project Selector */}
                             <ProjectSelector
                                 selectedProjectId={selectedProjectId}
                                 onProjectSelect={setSelectedProjectId}
@@ -709,5 +701,21 @@ export default function NPVCalculatorPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+// ✅ MAIN EXPORT: Wrapped in Suspense
+export default function NPVCalculatorPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <div className="text-center">
+                    <Calculator className="h-12 w-12 text-gray-400 mx-auto mb-4 animate-pulse" />
+                    <p className="text-gray-600 dark:text-gray-400">Loading NPV Calculator...</p>
+                </div>
+            </div>
+        }>
+            <NPVCalculatorContent />
+        </Suspense>
     );
 }
