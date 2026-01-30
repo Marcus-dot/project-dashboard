@@ -547,7 +547,7 @@ function NPVCalculatorContent() {
                                         tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                                     />
                                     <Tooltip
-                                        formatter={(value: number) => [formatCurrency(value), 'Cumulative NPV']}
+                                        formatter={(value: number | undefined) => [formatCurrency(value || 0), 'Cumulative NPV']}
                                         labelFormatter={(label) => `${getPeriodLabel(periodType, label)}`}
                                         contentStyle={{
                                             backgroundColor: '#ffffff',
