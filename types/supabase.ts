@@ -58,6 +58,52 @@ export interface Database {
                     }
                 ]
             }
+            invitations: {
+                Row: {
+                    id: string
+                    company_id: string
+                    invited_by: string | null
+                    email: string
+                    dashly_role: string
+                    token: string
+                    status: string
+                    expires_at: string
+                    accepted_at: string | null
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    company_id: string
+                    invited_by?: string | null
+                    email: string
+                    dashly_role?: string
+                    token?: string
+                    status?: string
+                    expires_at?: string
+                    accepted_at?: string | null
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    company_id?: string
+                    invited_by?: string | null
+                    email?: string
+                    dashly_role?: string
+                    token?: string
+                    status?: string
+                    expires_at?: string
+                    accepted_at?: string | null
+                    created_at?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "invitations_company_id_fkey"
+                        columns: ["company_id"]
+                        referencedRelation: "companies"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
             npv_calculations: {
                 Row: {
                     id: string
@@ -138,6 +184,8 @@ export interface Database {
                     full_name: string | null
                     company_id: string | null
                     role: string
+                    dashly_role: string
+                    industry: string | null
                     created_at: string
                     updated_at: string
                 }
@@ -147,6 +195,8 @@ export interface Database {
                     full_name?: string | null
                     company_id?: string | null
                     role?: string
+                    dashly_role?: string
+                    industry?: string | null
                     created_at?: string
                     updated_at?: string
                 }
@@ -156,6 +206,8 @@ export interface Database {
                     full_name?: string | null
                     company_id?: string | null
                     role?: string
+                    dashly_role?: string
+                    industry?: string | null
                     created_at?: string
                     updated_at?: string
                 }

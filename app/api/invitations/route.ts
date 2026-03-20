@@ -1,0 +1,288 @@
+// POST /api/invitations  → create a new invitation
+// GET  /api/invitations  → list all invitations for the current user's company
+
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { Resend } from 'resend'
+import type { CreateInvitationPayload } from '@/types/team'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+// ─────────────────────────────────────────
+// GET — list invitations for company
+// ─────────────────────────────────────────
+export async function GET() {
+    try {
+        const supabase = await createClient()
+
+        // Get current user
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+        }
+
+        // Get their profile to find company_id
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('company_id, dashly_role')
+            .eq('id', user.id)
+            .single()
+
+        if (profileError || !profile?.company_id) {
+            return NextResponse.json({ error: 'Profile or company not found' }, { status: 404 })
+        }
+
+        // Fetch all invitations for this company
+        const { data: invitations, error } = await supabase
+            .from('invitations')
+            .select('*')
+            .eq('company_id', profile.company_id)
+            .order('created_at', { ascending: false })
+
+        if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 })
+        }
+
+        return NextResponse.json({ invitations })
+    } catch (err) {
+        console.error('[GET /api/invitations]', err)
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+}
+
+// ─────────────────────────────────────────
+// POST — create invitation + send email
+// ─────────────────────────────────────────
+export async function POST(request: NextRequest) {
+    try {
+        const supabase = await createClient()
+
+        // Get current user
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+        }
+
+        // Get their profile
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('company_id, dashly_role, full_name, email')
+            .eq('id', user.id)
+            .single()
+
+        if (profileError || !profile?.company_id) {
+            return NextResponse.json({ error: 'Profile or company not found' }, { status: 404 })
+        }
+
+        // Only DASHMASTER or DASHKEEPER can invite
+        if (!['DASHMASTER', 'DASHKEEPER'].includes(profile.dashly_role)) {
+            return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+        }
+
+        // Parse request body
+        const body: CreateInvitationPayload = await request.json()
+        const { email, dashly_role } = body
+
+        if (!email || !dashly_role) {
+            return NextResponse.json({ error: 'Email and role are required' }, { status: 400 })
+        }
+
+        // DASHKEEPER cannot invite DASHMASTER
+        if (profile.dashly_role === 'DASHKEEPER' && dashly_role === 'DASHMASTER') {
+            return NextResponse.json(
+                { error: 'Dashkeepers cannot invite Dashmasters' },
+                { status: 403 }
+            )
+        }
+
+        // Check DASHMASTER cap (max 2 per company)
+        if (dashly_role === 'DASHMASTER') {
+            const { count } = await supabase
+                .from('profiles')
+                .select('*', { count: 'exact', head: true })
+                .eq('company_id', profile.company_id)
+                .eq('dashly_role', 'DASHMASTER')
+
+            if ((count ?? 0) >= 2) {
+                return NextResponse.json(
+                    { error: 'Maximum of 2 Dashmasters allowed per company' },
+                    { status: 400 }
+                )
+            }
+        }
+
+        // Check for existing pending invitation for this email
+        const { data: existing } = await supabase
+            .from('invitations')
+            .select('id, status')
+            .eq('company_id', profile.company_id)
+            .eq('email', email)
+            .eq('status', 'pending')
+            .single()
+
+        if (existing) {
+            return NextResponse.json(
+                { error: 'A pending invitation already exists for this email' },
+                { status: 409 }
+            )
+        }
+
+        // Get company name for email
+        const { data: company } = await supabase
+            .from('companies')
+            .select('name')
+            .eq('id', profile.company_id)
+            .single()
+
+        // Create the invitation (token auto-generated by DB trigger)
+        const { data: invitation, error: inviteError } = await supabase
+            .from('invitations')
+            .insert({
+                company_id: profile.company_id,
+                invited_by: user.id,
+                email,
+                dashly_role,
+            })
+            .select()
+            .single()
+
+        if (inviteError || !invitation) {
+            return NextResponse.json({ error: inviteError?.message ?? 'Failed to create invitation' }, { status: 500 })
+        }
+
+        // Build the acceptance URL
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+        const acceptUrl = `${baseUrl}/invite/${invitation.token}`
+
+        // Send email via Resend
+        const inviterName = profile.full_name ?? profile.email
+        const companyName = company?.name ?? 'your team'
+
+        const { error: emailError } = await resend.emails.send({
+            from: 'Dashly <onboarding@resend.dev>',
+            to: email,
+            subject: `You've been invited to join ${companyName} on Dashly`,
+            html: buildEmailTemplate({
+                inviterName,
+                companyName,
+                dashly_role,
+                acceptUrl,
+            }),
+        })
+
+        if (emailError) {
+            // Invitation was created — don't fail the whole request, just warn
+            console.error('[Resend error]', emailError)
+            return NextResponse.json({
+                invitation,
+                warning: 'Invitation created but email failed to send',
+            })
+        }
+
+        return NextResponse.json({ invitation }, { status: 201 })
+    } catch (err) {
+        console.error('[POST /api/invitations]', err)
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+}
+
+// ─────────────────────────────────────────
+// Email template
+// ─────────────────────────────────────────
+function buildEmailTemplate({
+    inviterName,
+    companyName,
+    dashly_role,
+    acceptUrl,
+}: {
+    inviterName: string
+    companyName: string
+    dashly_role: string
+    acceptUrl: string
+}) {
+    const roleLabels: Record<string, string> = {
+        DASHMASTER: 'Dashmaster',
+        DASHKEEPER: 'Dashkeeper',
+        OBSERVER: 'Observer',
+    }
+    const roleLabel = roleLabels[dashly_role] ?? dashly_role
+
+    return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      </head>
+      <body style="margin:0;padding:0;background:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="560" cellpadding="0" cellspacing="0" style="background:#111;border-radius:16px;border:1px solid #222;overflow:hidden;">
+                
+                <!-- Header -->
+                <tr>
+                  <td style="background:linear-gradient(135deg,#6E3482,#A56ABD);padding:40px;text-align:center;">
+                    <h1 style="margin:0;color:#fff;font-size:32px;font-weight:800;letter-spacing:-1px;">Dashly</h1>
+                    <p style="margin:8px 0 0;color:rgba(255,255,255,0.8);font-size:14px;">Project Management Dashboard</p>
+                  </td>
+                </tr>
+
+                <!-- Body -->
+                <tr>
+                  <td style="padding:40px;">
+                    <h2 style="margin:0 0 16px;color:#fff;font-size:22px;font-weight:700;">
+                      You've been invited
+                    </h2>
+                    <p style="margin:0 0 24px;color:#999;font-size:15px;line-height:1.6;">
+                      <strong style="color:#fff;">${inviterName}</strong> has invited you to join
+                      <strong style="color:#fff;">${companyName}</strong> on Dashly as a
+                      <strong style="color:#A56ABD;">${roleLabel}</strong>.
+                    </p>
+
+                    <!-- Role badge -->
+                    <div style="background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:16px 20px;margin-bottom:32px;">
+                      <p style="margin:0;color:#666;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Your role</p>
+                      <p style="margin:4px 0 0;color:#A56ABD;font-size:18px;font-weight:700;">${roleLabel}</p>
+                    </div>
+
+                    <!-- CTA Button -->
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center">
+                          <a href="${acceptUrl}"
+                            style="display:inline-block;background:linear-gradient(135deg,#6E3482,#A56ABD);color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:8px;letter-spacing:0.3px;">
+                            Accept Invitation
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p style="margin:24px 0 0;color:#555;font-size:13px;text-align:center;">
+                      Or copy this link:<br/>
+                      <span style="color:#A56ABD;word-break:break-all;">${acceptUrl}</span>
+                    </p>
+
+                    <p style="margin:24px 0 0;color:#555;font-size:12px;text-align:center;">
+                      This invitation expires in 7 days.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding:20px 40px;border-top:1px solid #222;text-align:center;">
+                    <p style="margin:0;color:#444;font-size:12px;">
+                      Dashly · Built for emerging markets
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `
+}

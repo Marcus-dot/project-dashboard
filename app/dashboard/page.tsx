@@ -39,6 +39,7 @@ import {
     LogOut,
     Building2,
     User,
+    Users,
     Heart,
     Shield,
     CheckCircle2,
@@ -608,6 +609,12 @@ export default function DashboardPage() {
                             )}
                         </div>
 
+                        <Link href="/dashboard/team">
+                            <Button variant="outline" className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                <span className="hidden sm:inline">Team</span>
+                            </Button>
+                        </Link>
                         <Link href="/reports">
                             <Button variant="outline" className="flex items-center gap-2">
                                 <FileText className="h-4 w-4" />
